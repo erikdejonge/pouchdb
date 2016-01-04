@@ -83,6 +83,21 @@ adapters.forEach(function (adapter) {
       });
     });
 
+    it('[4595] should reject xhr errors', function(done){
+      var invalidUrl = 'http:///';
+      new PouchDB(dbs.name).replicate.to(invalidUrl, {}).catch(function() {
+        done();
+      });
+
+    });
+    it('[4595] should emit error event on xhr error', function(done){
+      var invalidUrl = 'http:///';
+      new PouchDB(dbs.name).replicate.to(invalidUrl,{})
+      .on('error',function(err,changes){
+        done();
+      });
+    });
+
     it('Add a doc', function (done) {
       var db = new PouchDB(dbs.name);
       db.post({test: 'somestuff'}, function (err, info) {
@@ -716,8 +731,8 @@ adapters.forEach(function (adapter) {
     });
 
     it('Error works', function () {
-      var newError = PouchDB.Errors
-        .error(PouchDB.Errors.BAD_REQUEST, 'love needs no message');
+      var newError = PouchDB.utils
+        .createError(PouchDB.Errors.BAD_REQUEST, 'love needs no message');
       newError.status.should.equal(PouchDB.Errors.BAD_REQUEST.status);
       newError.name.should.equal(PouchDB.Errors.BAD_REQUEST.name);
       newError.message.should.equal(PouchDB.Errors.BAD_REQUEST.message,
@@ -1022,6 +1037,11 @@ adapters.forEach(function (adapter) {
       });
     });
 
+    it('db.type() returns a type', function () {
+      var db = new PouchDB(dbs.name);
+      db.type().should.be.a('string');
+    });
+
     it('replace PouchDB.destroy() (express-pouchdb#203)', function (done) {
       var old = PouchDB.destroy;
       PouchDB.destroy = function (name, callback) {
@@ -1061,6 +1081,26 @@ adapters.forEach(function (adapter) {
 
         delete savedDoc._rev;
         savedDoc.should.deep.equal(doc);
+      });
+    });
+
+    it('4712 invalid rev for new doc generates conflict', function () {
+      // CouchDB 1.X has a bug which allows this insertion via bulk_docs
+      // (which PouchDB uses for all document insertions)
+      if (adapter === 'http' && !testUtils.isCouchMaster()) {
+        return;
+      }
+
+      var db = new PouchDB(dbs.name);
+      var newdoc = {
+        '_id': 'foobar',
+        '_rev': '1-123'
+      };
+
+      return db.put(newdoc).then(function () {
+        throw new Error('expected an error');
+      }, function (err) {
+        err.should.have.property('status', 409);
       });
     });
 
