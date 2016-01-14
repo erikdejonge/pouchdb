@@ -2,13 +2,8 @@
 
 'use strict';
 
-var fs = require('fs');
 var Promise = require('lie');
-var watchify = require('watchify');
 var watch = require('node-watch');
-var browserify = require('browserify');
-var cors_proxy = require('corsproxy');
-var http_proxy = require('pouchdb-http-proxy');
 var http_server = require('http-server');
 var spawn = require('child_process').spawn;
 
@@ -26,70 +21,44 @@ if (process.env.AUTO_COMPACTION) {
 if (process.env.POUCHDB_SRC) {
   queryParams.src = process.env.POUCHDB_SRC;
 }
-
-var perfRoot = './tests/performance/';
-var performanceBundle = './tests/performance-bundle.js';
-
-var b = watchify(browserify({
-  entries: perfRoot,
-  cache: {},
-  packageCache: {},
-  fullPaths: true,
-  debug: true
-})).on('update', rebuildPerfTests);
-
-function rebuildPerfTests(callback) {
-  b.bundle().pipe(fs.createWriteStream(performanceBundle))
-    .on('finish', function () {
-      console.log('Updated: ', performanceBundle);
-      if (typeof callback === 'function') {
-        callback();
-      }
-    });
+if (process.env.COUCH_HOST) {
+  queryParams.couchHost = process.env.COUCH_HOST;
 }
 
 var rebuildPromise = Promise.resolve();
 
-function rebuild(callback) {
+function rebuild() {
   // only run one build at a time
   rebuildPromise = rebuildPromise.then(function () {
-    var child = spawn('npm', ['run', 'build']);
-    child.stdout.on('data', function (buf) {
-      console.log(String(buf).replace(/\s*$/, ''));
-    });
-    child.stderr.on('data', function (buf) {
-      console.log(String(buf).replace(/\s*$/, ''));
-    });
-    child.on('close', function () {
-      if (typeof callback === 'function') {
-        callback();
-      }
+    return new Promise(function (resolve) {
+      var child = spawn('npm', ['run', 'build']);
+      child.stdout.on('data', function (buf) {
+        console.log(String(buf).replace(/\s*$/, ''));
+      });
+      child.stderr.on('data', function (buf) {
+        console.log(String(buf).replace(/\s*$/, ''));
+      });
+      child.on('close', resolve);
     });
   });
+  return rebuildPromise;
 }
 
 watch('./src', rebuild);
 
 var filesWritten = false;
 
-new Promise(function (resolve) {
-  if (require.main === module) {
-    return rebuild(resolve);
+Promise.resolve().then(function () {
+  if (require.main !== module) {
+    return; // don't bother rebuilding if we're in `npm run dev`
   }
-  resolve(); // don't bother rebuilding if we're in `npm run dev`
-}).then(function () {
-  return new Promise(function (resolve) {
-    rebuildPerfTests(resolve);
-  });
+  return rebuild();
 }).then(function () {
   filesWritten = true;
   checkReady();
 });
 
-var COUCH_HOST = process.env.COUCH_HOST || 'http://127.0.0.1:5984';
-
 var HTTP_PORT = 8000;
-var CORS_PORT = 2020;
 
 // if SERVER=sync-gateway we also have 
 // tests/misc/sync-gateway-config-server.js 
@@ -101,23 +70,20 @@ var readyCallback;
 function startServers(callback) {
   readyCallback = callback;
   http_server.createServer().listen(HTTP_PORT, function () {
-    cors_proxy.options = {target: COUCH_HOST};
-    http_proxy.createServer(cors_proxy).listen(CORS_PORT, function () {
-      var testRoot = 'http://127.0.0.1:' + HTTP_PORT;
-      var query = '';
-      Object.keys(queryParams).forEach(function (key) {
-        query += (query ? '&' : '?');
-        query += key + '=' + encodeURIComponent(queryParams[key]);
-      });
-      console.log('Integration tests: ' + testRoot +
-        '/tests/integration/' + query);
-      console.log('Map/reduce  tests: ' + testRoot +
-      '/tests/mapreduce' + query);
-      console.log('Performance tests: ' + testRoot +
-        '/tests/performance/');
-      serversStarted = true;
-      checkReady();
+    var testRoot = 'http://127.0.0.1:' + HTTP_PORT;
+    var query = '';
+    Object.keys(queryParams).forEach(function (key) {
+      query += (query ? '&' : '?');
+      query += key + '=' + encodeURIComponent(queryParams[key]);
     });
+    console.log('Integration tests: ' + testRoot +
+                '/tests/integration/' + query);
+    console.log('Map/reduce  tests: ' + testRoot +
+                '/tests/mapreduce' + query);
+    console.log('Performance tests: ' + testRoot +
+                '/tests/performance/' + query);
+    serversStarted = true;
+    checkReady();
   });
 }
 
