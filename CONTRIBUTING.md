@@ -59,7 +59,9 @@ All dependancies installed? great, now building PouchDB itself is a breeze:
 
 You will now have various distributions of PouchDB in your `dist` folder, congratulations.
 
- * If you are on windows, you will need `node-gyp` to install levelup, visit https://github.com/TooTallNate/node-gyp#installation for installation instructions.
+Note that the source code is in `src/`, which is built by [Rollup](http://rollupjs.org/) as a
+Node module to `lib/`, which is then built by [Browserify](http://browserify.com/) as a browser-ready
+UMD module to `dist/`. All of this logic is in `bin/build.sh`.
 
 Testing PouchDB
 --------------------------------------
@@ -147,7 +149,6 @@ Release Procedure
  * `npm run release`
  * Copy the `dist/pouchdb*` files from the $VERSION tag on github, paste the release notes and add the distribution files to Github Releases, rename `pouchdb.min.js` to `pouchdb-$VERSION.min.js` after you upload it.
  * `./node_modules/.bin/tin -v $VERSION+1-prerelease`
- * Put the new prerelease version in `lib/version-browser.js` too
  * Update docs/_config.yml to the current version
  * Push updated versions to master
  * `npm run publish-site`
