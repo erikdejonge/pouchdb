@@ -31,11 +31,15 @@ A list of known products and services that are using PouchDB.
 
 [eHealth Africa](http://ehealthafrica.org/) is an American-Nigerian NGO specialising in the development and deployment of tech for health. To tackle the Ebola outbreak, they built [mobile apps and dashboards](https://github.com/eHealthAfrica) to help track the spread of infection in the field. The combination of CouchDB and PouchDB enabled these apps to work consistently despite the extreme network unreliability of sub-saharan Africa.
 
-## HospitalRun
+## Hoodie
+
+{% include img.html width=150 src="HoodieLogo.png" alt="Hoodie" href="http://hood.ie/" %}
+
+[Hoodie](http://hood.ie/) provides a complete backend solution for your frontend code. It helps you develop your web application fast and easy. Hoodie-based apps are [offline-first](http://offlinefirst.org/) so they are usable anytime. Just plug Hoodie’s API into your frontend code, and your app is ready.
 
 {% include svg/hospitalrun-logo.html %}
 
-[HospitalRun](http://hospitalrun.io/) was designed to allow records to be carried to remote clinics. It works when there is no Internet, and syncs when there is.
+[HospitalRun](http://hospitalrun.io/) is an open source software product designed specifically for developing world hospitals, making usability the key requirement. Using PouchDB and offline-first design, HospitalRun allows records to be carried to remote clinics, functioning when there is no Internet, and syncing when there is.
 
 ## Local NPM
 
@@ -74,3 +78,7 @@ Story-writer is a free Markdown editor, with a [web version](http://markdown.xia
 ## Thali project
 
 [Thali](http://thaliproject.org/) is a Microsoft-sponsored open-source platform for creating apps that exploit the power of personal devices and put people in control of their data. It uses Cordova, PouchDB, OpenSSL, and Tor.
+
+## YLD
+
+[YLD](http://www.yld.io) is a Node.js software engineering, consulting and training company. We partner with enterprises to strengthen their software engineering culture and create the agility necessary to compete in today’s market, and are responsible for some of the largest Node.js solutions in production today. PouchDB allows us to create responsive, resilient and sync-enabled web applications.

@@ -27,7 +27,7 @@ All options default to `false` unless otherwise specified.
 * `options.since`: Replicate changes after the given sequence number.
 * `options.heartbeat`: Configure the heartbeat supported by CouchDB which keeps the change connection alive.
 * `options.timeout`: Request timeout (in milliseconds).
-* `options.batch_size`: Number of documents to process at a time. Defaults to 100. This affects the number of docs held in memory and the number sent at a time to the target server. You may need to adjust downward if targeting devices with low amounts of memory (e.g. phones) or if the documents are large in size (e.g. with attachments). If your documents are small in size, then increasing this number will probably speed replication up.
+* `options.batch_size`: Number of documents to process at a time. Defaults to 100. This affects the number of docs held in memory and the number sent at a time to the target server. You may need to adjust downward if targeting devices with low amounts of memory (e.g. phones) or if the documents are large in size. If your documents are small in size, then increasing this number will probably speed replication up.
 * `options.batches_limit`: Number of batches to process at a time. Defaults to 10. This (along wtih `batch_size`) controls how many docs are kept in memory at a time, so the maximum docs in memory at once would equal `batch_size` &times; `batches_limit`.
 * `options.back_off_function`: backoff function to be used in `retry` replication. This is a function that takes the current backoff as input (or 0 the first time) and returns a new backoff in milliseconds. You can use this to tweak when and how replication will try to reconnect to a remote database when the user goes offline. Defaults to a function that chooses a random backoff between 0 and 2 seconds and doubles every time it fails to connect. (See [Customizing retry replication](#customizing-retry-replication) below.)
 
@@ -39,12 +39,12 @@ var rep = PouchDB.replicate('mydb', 'http://localhost:5984/mydb', {
   retry: true
 }).on('change', function (info) {
   // handle change
-}).on('paused', function () {
-  // replication paused (e.g. user went offline)
+}).on('paused', function (err) {
+  // replication paused (e.g. replication up to date, user went offline)
 }).on('active', function () {
-  // replicate resumed (e.g. user went back online)
-}).on('denied', function (info) {
-  // a document failed to replicate, e.g. due to permissions
+  // replicate resumed (e.g. new changes replicating, user went back online)
+}).on('denied', function (err) {
+  // a document failed to replicate (e.g. due to permissions)
 }).on('complete', function (info) {
   // handle complete
 }).on('error', function (err) {
@@ -85,6 +85,17 @@ db.replicate.to(remote, function (err, result) {
 });
 {% endhighlight %}
 {% include code/end.html %}
+
+{% include code/start.html id="replication1" type="async" %}
+{% highlight js %}
+try {
+  var result = await db.replicate.to(remote);
+} catch (err) {
+  console.log(err);
+}
+{% endhighlight %}
+{% include code/end.html %}
+
 {% include code/start.html id="replication1" type="promise" %}
 {% highlight js %}
 db.replicate.to(remote).then(function (result) {

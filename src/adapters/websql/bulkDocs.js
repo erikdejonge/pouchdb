@@ -1,4 +1,4 @@
-import collections from 'pouchdb-collections';
+import { Map } from 'pouchdb-collections';
 import preprocessAttachments from '../../deps/docs/preprocessAttachments';
 import isLocalId from '../../deps/docs/isLocalId';
 import processDocs from '../../deps/docs/processDocs';
@@ -26,7 +26,7 @@ import {
   escapeBlob
 } from './utils';
 
-function websqlBulkDocs(dbOpts, req, opts, api, db, Changes, callback) {
+function websqlBulkDocs(dbOpts, req, opts, api, db, websqlChanges, callback) {
   var newEdits = opts.new_edits;
   var userDocs = req.docs;
 
@@ -48,14 +48,14 @@ function websqlBulkDocs(dbOpts, req, opts, api, db, Changes, callback) {
 
   var tx;
   var results = new Array(docInfos.length);
-  var fetchedDocs = new collections.Map();
+  var fetchedDocs = new Map();
 
   var preconditionErrored;
   function complete() {
     if (preconditionErrored) {
       return callback(preconditionErrored);
     }
-    Changes.notify(api._name);
+    websqlChanges.notify(api._name);
     api._docCount = -1; // invalidate
     callback(null, results);
   }
@@ -208,6 +208,7 @@ function websqlBulkDocs(dbOpts, req, opts, api, db, Changes, callback) {
       if (!att.stub) {
         var data = att.data;
         delete att.data;
+        att.revpos = parseInt(winningRev, 10);
         var digest = att.digest;
         saveAttachment(digest, data, attachmentSaved);
       } else {
@@ -220,17 +221,14 @@ function websqlBulkDocs(dbOpts, req, opts, api, db, Changes, callback) {
       finish();
     }
 
-    function autoCompact() {
-      if (!isUpdate || !api.auto_compaction) {
-        return; // nothing to do
-      }
-      var id = docInfo.metadata.id;
-      var revsToDelete = compactTree(docInfo.metadata);
-      compactRevs(revsToDelete, id, tx);
-    }
-
     function dataWritten(tx, seq) {
-      autoCompact();
+      var id = docInfo.metadata.id;
+      if (isUpdate && api.auto_compaction) {
+        compactRevs(compactTree(docInfo.metadata), id, tx);
+      } else if (docInfo.stemmedRevs.length) {
+        compactRevs(docInfo.stemmedRevs, id, tx);
+      }
+
       docInfo.metadata.seq = seq;
       delete docInfo.metadata.rev;
 
@@ -242,7 +240,6 @@ function websqlBulkDocs(dbOpts, req, opts, api, db, Changes, callback) {
         : 'INSERT INTO ' + DOC_STORE +
       ' (id, winningseq, max_seq, json) VALUES (?,?,?,?);';
       var metadataStr = safeJsonStringify(docInfo.metadata);
-      var id = docInfo.metadata.id;
       var params = isUpdate ?
         [metadataStr, seq, winningRev, id] :
         [id, seq, seq, metadataStr];

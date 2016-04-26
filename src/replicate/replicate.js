@@ -80,7 +80,7 @@ function replicate(src, target, opts, returnValue, result) {
         return error.name !== 'unauthorized' && error.name !== 'forbidden';
       });
 
-      docs.forEach(function(doc) {
+      docs.forEach(function (doc) {
         var error = errorsById[doc._id];
         if (error) {
           returnValue.emit('denied', clone(error));
@@ -102,6 +102,9 @@ function replicate(src, target, opts, returnValue, result) {
   }
 
   function finishBatch() {
+    if (currentBatch.error) {
+      throw new Error('There was a problem getting docs.');
+    }
     result.last_seq = last_seq = currentBatch.seq;
     var outResult = clone(result);
     if (changedDocs.length) {
@@ -148,8 +151,9 @@ function replicate(src, target, opts, returnValue, result) {
   }
 
   function getBatchDocs() {
-    return getDocs(src, currentBatch.diffs, returnValue).then(function (docs) {
-      docs.forEach(function (doc) {
+    return getDocs(src, currentBatch.diffs, returnValue).then(function (got) {
+      currentBatch.error = !got.ok;
+      got.docs.forEach(function (doc) {
         delete currentBatch.diffs[doc._id];
         result.docs_read++;
         currentBatch.docs.push(doc);

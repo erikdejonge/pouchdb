@@ -1,4 +1,4 @@
-import collections from 'pouchdb-collections';
+import { Map } from 'pouchdb-collections';
 import { createError, MISSING_STUB } from '../../deps/errors';
 import preprocessAttachments from '../../deps/docs/preprocessAttachments';
 import processDocs from '../../deps/docs/processDocs';
@@ -11,8 +11,7 @@ import {
   ATTACH_STORE,
   BY_SEQ_STORE,
   DOC_STORE,
-  LOCAL_STORE,
-  META_STORE
+  LOCAL_STORE
 } from './constants';
 
 import {
@@ -23,7 +22,7 @@ import {
   openTransactionSafely
 } from './utils';
 
-function idbBulkDocs(dbOpts, req, opts, api, idb, Changes, callback) {
+function idbBulkDocs(dbOpts, req, opts, api, idb, idbChanges, callback) {
   var docInfos = req.docs;
   var txn;
   var docStore;
@@ -49,7 +48,7 @@ function idbBulkDocs(dbOpts, req, opts, api, idb, Changes, callback) {
   }
 
   var results = new Array(docInfos.length);
-  var fetchedDocs = new collections.Map();
+  var fetchedDocs = new Map();
   var preconditionErrored = false;
   var blobType = api._meta.blobSupport ? 'blob' : 'base64';
 
@@ -64,7 +63,7 @@ function idbBulkDocs(dbOpts, req, opts, api, idb, Changes, callback) {
 
     var stores = [
       DOC_STORE, BY_SEQ_STORE,
-      ATTACH_STORE, META_STORE,
+      ATTACH_STORE,
       LOCAL_STORE, ATTACH_AND_SEQ_STORE
     ];
     var txnResult = openTransactionSafely(idb, stores, 'readwrite');
@@ -133,7 +132,7 @@ function idbBulkDocs(dbOpts, req, opts, api, idb, Changes, callback) {
       return;
     }
 
-    Changes.notify(api._meta.name);
+    idbChanges.notify(api._meta.name);
     api._meta.docCount += docCountDelta;
     callback(null, results);
   }
@@ -235,7 +234,10 @@ function idbBulkDocs(dbOpts, req, opts, api, idb, Changes, callback) {
     function afterPutDoc(e) {
       if (isUpdate && api.auto_compaction) {
         autoCompact(docInfo);
+      } else if (docInfo.stemmedRevs.length) {
+        compactRevs(docInfo.stemmedRevs, docInfo.metadata.id, txn);
       }
+
       metadata.seq = e.target.result;
       // Current _rev is calculated from _rev_tree on read
       delete metadata.rev;
@@ -299,6 +301,7 @@ function idbBulkDocs(dbOpts, req, opts, api, idb, Changes, callback) {
       if (!att.stub) {
         var data = att.data;
         delete att.data;
+        att.revpos = parseInt(winningRev, 10);
         var digest = att.digest;
         saveAttachment(digest, data, attachmentSaved);
       } else {
@@ -351,7 +354,7 @@ function idbBulkDocs(dbOpts, req, opts, api, idb, Changes, callback) {
 
 
     var getKeyReq = attachStore.count(digest);
-    getKeyReq.onsuccess = function(e) {
+    getKeyReq.onsuccess = function (e) {
       var count = e.target.result;
       if (count) {
         return callback(); // already exists

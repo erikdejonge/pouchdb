@@ -61,9 +61,6 @@ if (process.env.GREP) {
 if (process.env.ADAPTERS) {
   qs.adapters = process.env.ADAPTERS;
 }
-if (process.env.ES5_SHIM || process.env.ES5_SHIMS) {
-  qs.es5shim = true;
-}
 if (process.env.AUTO_COMPACTION) {
   qs.autoCompaction = true;
 }
@@ -88,7 +85,6 @@ if (process.env.TRAVIS &&
     process.env.TRAVIS_SECURE_ENV_VARS === 'false') {
   console.error('Not running test, cannot connect to saucelabs');
   process.exit(0);
-  return;
 }
 
 function testError(e) {
@@ -114,7 +110,7 @@ function postResult(result) {
         method: 'POST',
         uri: process.env.DASHBOARD_HOST + '/performance_results',
         json: result
-      }, function (error, response, body) {
+      }, function (error) {
         console.log(result);
         process.exit(!!error);
       });
@@ -141,12 +137,12 @@ function testComplete(result) {
 function startSelenium(callback) {
   // Start selenium
   var opts = {version: SELENIUM_VERSION};
-  selenium.install(opts, function(err) {
+  selenium.install(opts, function (err) {
     if (err) {
       console.error('Failed to install selenium');
       process.exit(1);
     }
-    selenium.start(opts, function(err, server) {
+    selenium.start(opts, function () {
       sauceClient = wd.promiseChainRemote();
       callback();
     });

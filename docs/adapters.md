@@ -133,6 +133,13 @@ However, this only occurs if the adapter is `'websql'`, not `'idb'` (e.g. on And
 var db = new PouchDB('myDB', {adapter: 'websql'});
 ```
 
+Note that a recent change to Cordova SQLite Plugin requires the `location` or `iosDatabaseLocation` parameters in the openDatabase and deleteDatabase calls (the second is preferred - see [SQLite Plugin][] for details). In PouchDB, all given options are passed through to the SQLite plugin, so you can pass this param like so:
+
+```js
+var db = new PouchDB('myDB', {adapter: 'websql', iosDatabaseLocation: 'default'});
+```
+
+
 If you are unsure whether PouchDB is using the SQLite Plugin or not, just run:
 
 ```js
@@ -150,6 +157,10 @@ We recommend avoiding the SQLite Plugin, unless you are hitting the 50MB storage
 
 {% endmarkdown %}
 {% include alert/end.html%}
+
+### Cordova SQLite Plugin 2
+
+There is now a rewrite of the SQLite Plugin available, appropriately named [SQLite Plugin 2][], which should be a drop-in replacement for the SQLite Plugin.  We recommend preferring the [SQLite Plugin 2][] over the original, because it passes the PouchDB test suite on both iOS and Android.  Note that the rewrite does not require the `location` or `iosDatabaseLocation` parameter, as the SQLite Plugin does.
 
 ### Browser adapter plugins
 
@@ -267,6 +278,23 @@ var pouch = new PouchDB('riak://localhost:8087/somebucket', {db: require('riakdo
 
 There are many other LevelDOWN-based plugins &ndash; far too many to list here. You can find a [mostly-complete list on Github](https://github.com/rvagg/node-levelup/wiki/Modules#storage-back-ends) that includes implementations on top of MySQL, Windows Azure Table Storage, and SQLite.
 
+#### node-websql adapter
+
+In addition to the LevelDOWN-based adapters, you can also use PouchDB over
+[SQLite3](https://github.com/mapbox/node-sqlite3) in Node, using the WebSQL adapter and
+[node-websql](https://github.com/nolanlawson/node-websql):
+
+```js
+var PouchDB = require('pouchdb');
+require('pouchdb/extras/websql');
+
+var db = new PouchDB('mydatabase.db', {adapter: 'websql'});
+```
+
+This should be more efficient than something like [sqldown](https://github.com/calvinmetcalf/SQLdown), because
+instead of using a LevelDB-esque adapter over SQLite, PouchDB is directly using
+SQLite queries to build the database.
+
 
 {% include alert/start.html variant="warning"%}
 We do not currently test against any LevelDOWN adapters other than LevelDB and MemDOWN, so the other backends should be considered experimental.
@@ -321,6 +349,7 @@ The best place to look for information on which browsers support which databases
 [LocalStorage]: https://developer.mozilla.org/en-US/docs/Web/Guide/API/DOM/Storage
 [es5-shims]: https://github.com/es-shims/es5-shim
 [sqlite plugin]: https://github.com/brodysoft/Cordova-SQLitePlugin
+[sqlite plugin 2]: https://github.com/nolanlawson/cordova-plugin-sqlite-2
 [leveldown]: https://github.com/rvagg/node-leveldown
 [level-js]: https://github.com/maxogden/level.js
 [memdown]: https://github.com/rvagg/memdown

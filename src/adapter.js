@@ -1,7 +1,7 @@
 import { extend as extend } from 'js-extend';
 import Promise from './deps/promise';
 import pick from './deps/pick';
-import collections from 'pouchdb-collections';
+import { Map } from 'pouchdb-collections';
 import inherits from 'inherits';
 import getArguments from 'argsarray';
 import adapterFun from './deps/adapterFun';
@@ -26,7 +26,7 @@ import {
   BAD_REQUEST,
   NOT_AN_OBJECT,
   INVALID_REV,
-  createError,
+  createError
 } from './deps/errors';
 
 /*
@@ -185,6 +185,67 @@ function attachmentNameError(name) {
   return false;
 }
 
+function cacheUpdateRequired(api, cache, designDocName, callback) {
+  cache.seq = cache.seq || 0;
+  var changesOpts = {
+    doc_ids: [ '_design/' + designDocName ],
+    limit: 1,
+    since: cache.seq
+  };
+  api.changes(changesOpts).then(function (res) {
+    var latestSeq = res.results && res.results.length && res.results[0].seq;
+    if (latestSeq && latestSeq > cache.seq) {
+      // invalidate the cache
+      cache.seq = latestSeq;
+      delete cache.promise;
+    }
+    callback();
+  }).catch(callback);
+}
+
+function getDesignDocCache(api, designDocName, callback) {
+  api._ddocCache = api._ddocCache || {};
+  api._ddocCache[designDocName] = api._ddocCache[designDocName] || {};
+  var cache = api._ddocCache[designDocName];
+  cacheUpdateRequired(api, cache, designDocName, function (err) {
+    if (err) {
+      return callback(err);
+    }
+    if (!cache.promise) {
+      cache.promise = new Promise(function (resolve, reject) {
+        api._get('_design/' + designDocName, {}, function (err, res) {
+          if (err) {
+            return reject(err);
+          }
+          var cache = {};
+          ['views', 'filters'].forEach(function (propertyName) {
+            cache[propertyName] = res.doc[propertyName];
+          });
+          resolve(cache);
+        });
+      });
+    }
+    cache.promise.then(function (cache) {
+      callback(null, cache);
+    }).catch(callback);
+  });
+}
+
+function getDesignDocProperty(api, designDocName, propertyName,
+                              propertyElement, callback) {
+  getDesignDocCache(api, designDocName, function (err, designDoc) {
+    if (err) {
+      return callback(err);
+    }
+    var element = designDoc[propertyName] &&
+                  designDoc[propertyName][propertyElement];
+    if (!element) {
+      return callback(createError(MISSING_DOC));
+    }
+    callback(null, element);
+  });
+}
+
 inherits(AbstractPouchDB, EventEmitter);
 
 function AbstractPouchDB() {
@@ -212,6 +273,8 @@ AbstractPouchDB.prototype.put =
     callback = args.pop();
     return callback(createError(NOT_AN_OBJECT));
   }
+
+  /* eslint no-constant-condition: 0 */
   while (true) {
     temp = args.shift();
     temptype = typeof temp;
@@ -243,10 +306,9 @@ AbstractPouchDB.prototype.put =
 
 AbstractPouchDB.prototype.putAttachment =
   adapterFun('putAttachment', function (docId, attachmentId, rev,
-                                              blob, type, callback) {
+                                              blob, type) {
   var api = this;
   if (typeof type === 'function') {
-    callback = type;
     type = blob;
     blob = rev;
     rev = null;
@@ -260,10 +322,12 @@ AbstractPouchDB.prototype.putAttachment =
   }
 
   function createAttachment(doc) {
+    var prevrevpos = '_rev' in doc ? parseInt(doc._rev, 10) : 0;
     doc._attachments = doc._attachments || {};
     doc._attachments[attachmentId] = {
       content_type: type,
-      data: blob
+      data: blob,
+      revpos: ++prevrevpos
     };
     return api.put(doc);
   }
@@ -358,7 +422,7 @@ AbstractPouchDB.prototype.revsDiff =
   }
 
   var count = 0;
-  var missing = new collections.Map();
+  var missing = new Map();
 
   function addToMissing(id, revId) {
     if (!missing.has(id)) {
@@ -565,7 +629,7 @@ AbstractPouchDB.prototype.get =
         for (var i = 0; i < leaves.length; i++) {
           var l = leaves[i];
           // looks like it's the only thing couchdb checks
-          if (!(typeof(l) === "string" && /^\d+-/.test(l))) {
+          if (!(typeof (l) === "string" && /^\d+-/.test(l))) {
             return callback(createError(INVALID_REV));
           }
         }
@@ -663,6 +727,16 @@ AbstractPouchDB.prototype.get =
       callback(null, doc);
     }
   });
+});
+
+AbstractPouchDB.prototype.getView =
+  adapterFun('getView', function (designDocName, viewName, callback) {
+  getDesignDocProperty(this, designDocName, 'views', viewName, callback);
+});
+
+AbstractPouchDB.prototype.getFilter =
+  adapterFun('getFilter', function (designDocName, filterName, callback) {
+  getDesignDocProperty(this, designDocName, 'filters', filterName, callback);
 });
 
 AbstractPouchDB.prototype.getAttachment =
@@ -786,7 +860,7 @@ AbstractPouchDB.prototype.bulkDocs =
   }
 
   var attachmentError;
-  req.docs.forEach(function(doc) {
+  req.docs.forEach(function (doc) {
     if (doc._attachments) {
       Object.keys(doc._attachments).forEach(function (name) {
         attachmentError = attachmentError || attachmentNameError(name);
@@ -864,6 +938,7 @@ AbstractPouchDB.prototype.destroy =
       if (err) {
         return callback(err);
       }
+      self._destroyed = true;
       self.emit('destroyed');
       callback(null, resp || { 'ok': true });
     });

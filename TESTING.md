@@ -57,18 +57,6 @@ or
 
     $ COUCH_HOST=http://user:pass@myname.host.com npm test
 
-#### Test with ES5 shims
-
-Some older browsers require [es5 shims](https://github.com/es-shims/es5-shim). Enable them with:
-
-    $ ES5_SHIM=true npm run dev
-
-or e.g.:
-
-    $ ES5_SHIM=true CLIENT=selenium:phantomjs npm test
-
-or you can append it as `?es5shim=true` if you manually opened a browser window.
-
 #### Other test options
 
 * `SKIP_MIGRATION=1` should be used to skip the migration tests.
@@ -169,6 +157,10 @@ The value is a comma-separated list of key values, where the key-values are sepa
 Some Level adapters also require a standard database name prefix (e.g. `riak://` or `mysql://`), which you can specify like so:
 
     LEVEL_PREFIX=riak://localhost:8087/
+
+To run the node-websql test in Node, run the tests with:
+
+    ADAPTER=websql
 
 ### Performance tests
 

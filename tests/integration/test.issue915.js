@@ -1,6 +1,8 @@
 'use strict';
 if (!process.env.LEVEL_ADAPTER &&
-    !process.env.LEVEL_PREFIX && !process.env.AUTO_COMPACTION) {
+    !process.env.LEVEL_PREFIX &&
+    !process.env.AUTO_COMPACTION &&
+    !process.env.ADAPTER) {
   // these tests don't make sense for anything other than default leveldown
   var fs = require('fs');
   describe('Remove DB', function () {
@@ -14,7 +16,7 @@ if (!process.env.LEVEL_ADAPTER &&
     it('Put a file in the db, then destroy it', function (done) {
       new PouchDB('veryimportantfiles', function (err, db) {
         fs.writeFile('./tmp/_pouch_veryimportantfiles/something',
-                     new Buffer('lalala'), function (err) {
+                     new Buffer('lalala'), function () {
           db.destroy(function (err) {
             if (err) {
               return done(err);

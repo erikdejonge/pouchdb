@@ -25,15 +25,20 @@ var spawn = require('child_process').spawn;
 var pkg = require('../package.json');
 var version = pkg.version;
 var external = Object.keys(pkg.dependencies).concat([
- 'fs', 'crypto', 'events', 'path', 'pouchdb', 'level-sublevel/legacy'
+ 'fs', 'crypto', 'events', 'path', 'pouchdb'
 ]);
 
 var plugins = ['fruitdown', 'localstorage', 'memory'];
 var extras = {
-  'deps/promise.js': 'promise.js',
-  'replicate/checkpointer.js': 'checkpointer.js',
-  'deps/ajax/prequest.js': 'ajax.js',
-  'replicate/generateReplicationId.js': 'generateReplicationId.js'
+  'src/deps/promise.js': 'promise.js',
+  'src/replicate/checkpointer.js': 'checkpointer.js',
+  'src/replicate/generateReplicationId.js': 'generateReplicationId.js',
+  'src/deps/ajax/prequest.js': 'ajax.js',
+  'src/plugins/websql/index.js': 'websql.js',
+  'src_browser/deps/ajax/prequest.js': 'ajax-browser.js',
+  'src_browser/replicate/checkpointer.js': 'checkpointer-browser.js',
+  'src_browser/replicate/generateReplicationId.js':
+    'generateReplicationId-browser.js'
 };
 
 var currentYear = new Date().getFullYear();
@@ -129,7 +134,7 @@ function doRollup(entry, fileOut) {
 
 // build for Node (index.js)
 function buildForNode() {
-  return mkdirp('lib').then(function() {
+  return mkdirp('lib').then(function () {
     return doRollup('src/index.js', 'lib/index.js');
   });
 }
@@ -158,7 +163,7 @@ function buildForBrowserify() {
 
 // build for the browser (dist)
 function buildForBrowser() {
-  return mkdirp('dist').then(function() {
+  return mkdirp('dist').then(function () {
     return doBrowserify('.', {standalone: 'PouchDB'});
   }).then(function (code) {
     code = comments.pouchdb + code;
@@ -183,7 +188,7 @@ function cleanup() {
 }
 
 function buildPluginsForBrowserify() {
-  return mkdirp('lib/extras').then(function() {
+  return mkdirp('lib/extras').then(function () {
     return Promise.all(plugins.map(function (plugin) {
       return doRollup('src_browser/plugins/' + plugin + '/index.js',
                       'lib/extras/' + plugin + '.js');
@@ -192,16 +197,16 @@ function buildPluginsForBrowserify() {
 }
 
 function buildExtras() {
-  return mkdirp('lib/extras').then(function() {
+  return mkdirp('lib/extras').then(function () {
     return Promise.all(Object.keys(extras).map(function (entry) {
       var target = extras[entry];
-      return doRollup('src_browser/' + entry, 'lib/extras/' + target);
+      return doRollup(entry, 'lib/extras/' + target);
     }));
   });
 }
 
 function buildPluginsForBrowser() {
-  return mkdirp('lib/extras').then(function() {
+  return mkdirp('lib/extras').then(function () {
     return Promise.all(plugins.map(function (plugin) {
       var source = 'lib/extras/' + plugin + '.js';
       return doBrowserify(source, {}, 'pouchdb').then(function (code) {
@@ -216,23 +221,27 @@ function buildPluginsForBrowser() {
 }
 
 if (process.argv[2] === 'node') {
-  buildForNode();
-  return;
-}
-
-Promise.resolve()
-  .then(function () { return rimraf('lib'); })
-  .then(function () { return rimraf('dist'); })
-  .then(buildForNode)
-  .then(buildForBrowserify)
-  .then(buildForBrowser)
-  .then(buildPluginsForBrowserify)
-  .then(buildPluginsForBrowser)
-  .then(buildExtras)
-  .then(buildPerformanceBundle)
-  .then(cleanup)
-  .catch(function (err) {
+  rimraf('lib').then(buildForNode).then(function () {
+    process.exit(0);
+  }).catch(function (err) {
     console.log(err.stack);
     process.exit(1);
-  }
-);
+  });
+} else {
+  Promise.resolve()
+    .then(function () { return rimraf('lib'); })
+    .then(function () { return rimraf('dist'); })
+    .then(buildForNode)
+    .then(buildForBrowserify)
+    .then(buildForBrowser)
+    .then(buildPluginsForBrowserify)
+    .then(buildPluginsForBrowser)
+    .then(buildExtras)
+    .then(buildPerformanceBundle)
+    .then(cleanup)
+    .catch(function (err) {
+      console.log(err.stack);
+      process.exit(1);
+    }
+  );
+}

@@ -12,10 +12,6 @@ git:
 sudo:
   false
 
-cache:
-  directories:
-    - /tmp/phantomjs
-
 addons:
   firefox: "41.0.1"
 
@@ -28,7 +24,7 @@ before_install:
   - docker run -d -p 3001:5984 klaemo/couchdb:2.0-dev --with-haproxy --with-admin-party-please -n 1
 
   # Because Saucelabs doesnt proxy 5984 on OSX
-  - export COUCH_HOST=http://127.0.0.1:3000
+  - "if [ -z \"$COUCH_HOST\" ]; then export COUCH_HOST=http://127.0.0.1:3000; fi"
 
 before_script:
   - "export DISPLAY=:99.0"
@@ -36,10 +32,17 @@ before_script:
 
     # Fail early so we dont run hours of saucelabs if we know there
     # is a lint failure
-  - npm run jshint
+  - npm run eslint
 
     # set up CORS
   - "./node_modules/.bin/add-cors-to-couchdb http://127.0.0.1:3000"
+
+    # Configure CORS against master
+  - curl -X PUT http://127.0.0.1:3001/_node/node1@127.0.0.1/_config/httpd/enable_cors -d '"true"'
+  - curl -X PUT http://127.0.0.1:3001/_node/node1@127.0.0.1/_config/cors/origins -d '"*"'
+  - curl -X PUT http://127.0.0.1:3001/_node/node1@127.0.0.1/_config/cors/credentials -d '"true"'
+  - curl -X PUT http://127.0.0.1:3001/_node/node1@127.0.0.1/_config/cors/methods -d '"GET, PUT, POST, HEAD, DELETE"'
+  - curl -X PUT http://127.0.0.1:3001/_node/node1@127.0.0.1/_config/cors/headers -d '"accept, authorization, content-type, origin, referer, x-csrf-token"'
 
 script: npm run $COMMAND
 
@@ -55,6 +58,9 @@ env:
   - CLIENT=node COMMAND=test
   - CLIENT=node LEVEL_PREFIX=foo_ COMMAND=test
 
+  # Test WebSQL in Node (using node-websql)
+  - CLIENT=node ADAPTER=websql COMMAND=test
+
   # Test against pouchdb-server
   - CLIENT=node SERVER=pouchdb-server COMMAND=test
   - CLIENT=selenium:firefox:41.0.1 SERVER=pouchdb-server COMMAND=test
@@ -65,33 +71,29 @@ env:
 
   # Test in firefox/phantomjs running on travis
   - CLIENT=selenium:firefox:41.0.1 COMMAND=test
-  - CLIENT=selenium:phantomjs ES5_SHIM=true COMMAND=test
+  - CLIENT=selenium:phantomjs COMMAND=test
 
   # Test auto-compaction in Node, Phantom, and Firefox
   - AUTO_COMPACTION=true CLIENT=node COMMAND=test
   - AUTO_COMPACTION=true CLIENT=selenium:firefox:41.0.1 COMMAND=test
-  - AUTO_COMPACTION=true CLIENT=selenium:phantomjs ES5_SHIM=true COMMAND=test
+  - AUTO_COMPACTION=true CLIENT=selenium:phantomjs COMMAND=test
 
   # Test map/reduce
   - TYPE=mapreduce CLIENT=node COMMAND=test
   - TYPE=mapreduce CLIENT=selenium:firefox:41.0.1 COMMAND=test
-  - TYPE=mapreduce CLIENT=selenium:phantomjs ES5_SHIM=true COMMAND=test
+  - TYPE=mapreduce CLIENT=selenium:phantomjs COMMAND=test
 
   # Testing in saucelabs
   - CLIENT=saucelabs:chrome COMMAND=test
   - CLIENT=saucelabs:safari:6 COMMAND=test
   - CLIENT="saucelabs:internet explorer:10:Windows 8" COMMAND=test
+  - CLIENT="saucelabs:MicrosoftEdge" COMMAND=test
   - CLIENT="saucelabs:internet explorer:10:Windows 8" ADAPTERS=memory COMMAND=test
-  - CLIENT="saucelabs:iphone:8.4:OS X 10.11" ADAPTERS=fruitdown GREP=suite2 INVERT=true COMMAND=test
-  - CLIENT="saucelabs:iphone:8.4:OS X 10.11" ADAPTERS=fruitdown GREP=suite2 COMMAND=test
+  - CLIENT="saucelabs:iphone:8.4:OS X 10.11" ADAPTERS=fruitdown COMMAND=test
 
   # split up the android+iphone tests as it goes over time
-  - GREP=suite2 INVERT=true SKIP_MIGRATION=true CLIENT="saucelabs:iphone:8.1:OS X 10.10" COMMAND=test
-  - GREP=suite2 SKIP_MIGRATION=true CLIENT="saucelabs:iphone:8.1:OS X 10.10" COMMAND=test
-
-  - GREP=suite2 CLIENT="saucelabs:Android:5.1:Linux" COMMAND=test
-  - GREP=suite2 INVERT=true CLIENT="saucelabs:Android:5.1:Linux" COMMAND=test
-
+  - SKIP_MIGRATION=true CLIENT="saucelabs:iphone:8.1:OS X 10.10" COMMAND=test
+  - CLIENT="saucelabs:Android:5.1:Linux" COMMAND=test
   - CLIENT=selenium:firefox:41.0.1 ADAPTERS=memory COMMAND=test
   - CLIENT=selenium:firefox:41.0.1 ADAPTERS=localstorage COMMAND=test
 
@@ -133,17 +135,12 @@ matrix:
   - env: CLIENT=selenium:firefox:41.0.1 SERVER=pouchdb-server COMMAND=test
   - env: SERVER_ADAPTER=memdown LEVEL_ADAPTER=memdown SERVER=pouchdb-server COMMAND=test
   - env: COMMAND=report-coverage
-  - env: CLIENT=selenium:phantomjs ES5_SHIM=true COMMAND=test
-  - env: AUTO_COMPACTION=true CLIENT=selenium:phantomjs ES5_SHIM=true COMMAND=test
-  - env: TYPE=mapreduce CLIENT=selenium:phantomjs ES5_SHIM=true COMMAND=test
   - env: CLIENT=selenium:firefox:41.0.1 SERVER=couchdb-master COUCH_HOST=https://$CLOUDANT_USERNAME:$CLOUDANT_PASSWORD@pouch.cloudant.com COMMAND=test
+  - env: CLIENT="saucelabs:MicrosoftEdge" COMMAND=test
 
   fast_finish: true
 
   include:
-    - node_js: "0.10"
-      services: docker
-      env: CLIENT=node COMMAND=test
     - node_js: "0.11"
       services: docker
       env: CLIENT=node COMMAND=test

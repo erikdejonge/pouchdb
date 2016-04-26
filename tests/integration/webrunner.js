@@ -33,7 +33,7 @@ function asyncLoadScript(url, callback) {
   script.src = url;
 
   // Handle the case where an optional callback was passed in.
-  if ("function" === typeof(callback)) {
+  if ("function" === typeof (callback)) {
     script.onload = function () {
       callback();
 
@@ -81,10 +81,10 @@ function startTests() {
     // Capture logs for selenium output
     var logs = [];
 
-    (function(){
+    (function (){
 
       var oldLog = console.log;
-      console.log = function() {
+      console.log = function () {
         var args = Array.prototype.slice.call(arguments);
         args.unshift('log');
         logs.push(args);
@@ -92,7 +92,7 @@ function startTests() {
       };
 
       var oldError = console.error;
-      console.error = function() {
+      console.error = function () {
         var args = Array.prototype.slice.call(arguments);
         args.unshift('error');
         logs.push(args);
@@ -137,20 +137,15 @@ function startTests() {
 if (window.cordova) {
   var hasGrep = window.GREP &&
       window.location.search.indexOf('grep=') === -1;
-  var hasEs5Shim = window.ES5_SHIM &&
-      window.location.search.indexOf('es5Shim=') === -1;
   var hasAutoCompaction = window.AUTO_COMPACTION &&
     window.location.search.indexOf('autoCompaction') === -1;
   var hasAdapters = window.ADAPTERS &&
     window.location.search.indexOf('adapters=') === -1;
 
-  if (hasGrep || hasEs5Shim || hasAutoCompaction || hasAdapters) {
+  if (hasGrep || hasAutoCompaction || hasAdapters) {
     var params = [];
     if (hasGrep) {
       params.push('grep=' + encodeURIComponent(window.GREP));
-    }
-    if (hasEs5Shim) {
-      params.push('es5Shim=' + encodeURIComponent(window.ES5_SHIM));
     }
     if (hasAutoCompaction) {
       params.push('autoCompaction=' +

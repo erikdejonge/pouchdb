@@ -46,6 +46,8 @@ import {
   unescapeBlob
 } from './utils';
 
+var websqlChanges = new Changes();
+
 function fetchAttachmentsIfNecessary(doc, opts, api, txn, cb) {
   var attachments = Object.keys(doc._attachments || {});
   if (!attachments.length) {
@@ -119,15 +121,10 @@ function WebSqlPouch(opts, callback) {
   api._docCount = -1; // cache sqlite count(*) for performance
   api._name = opts.name;
 
-  var openDBResult = openDB({
-    name: api._name,
-    version: POUCH_VERSION,
-    description: api._name,
-    size: size,
-    location: opts.location,
-    createFromLocation: opts.createFromLocation,
-    androidDatabaseImplementation: opts.androidDatabaseImplementation
-  });
+  // extend the options here, because sqlite plugin has a ton of options
+  // and they are constantly changing, so it's more prudent to allow anything
+  var websqlOpts = extend({}, opts, {size: size, version: POUCH_VERSION});
+  var openDBResult = openDB(websqlOpts);
   if (openDBResult.error) {
     return websqlError(callback)(openDBResult.error);
   }
@@ -546,7 +543,7 @@ function WebSqlPouch(opts, callback) {
   };
 
   api._bulkDocs = function (req, reqOpts, callback) {
-    websqlBulkDocs(opts, req, reqOpts, api, db, WebSqlPouch.Changes, callback);
+    websqlBulkDocs(opts, req, reqOpts, api, db, websqlChanges, callback);
   };
 
   api._get = function (id, opts, callback) {
@@ -724,11 +721,11 @@ function WebSqlPouch(opts, callback) {
 
     if (opts.continuous) {
       var id = api._name + ':' + uuid();
-      WebSqlPouch.Changes.addListener(api._name, id, api, opts);
-      WebSqlPouch.Changes.notify(api._name);
+      websqlChanges.addListener(api._name, id, api, opts);
+      websqlChanges.notify(api._name);
       return {
         cancel: function () {
-          WebSqlPouch.Changes.removeListener(api._name, id);
+          websqlChanges.removeListener(api._name, id);
         }
       };
     }
@@ -1015,7 +1012,7 @@ function WebSqlPouch(opts, callback) {
   };
 
   api._destroy = function (opts, callback) {
-    WebSqlPouch.Changes.removeAllListeners(api._name);
+    websqlChanges.removeAllListeners(api._name);
     db.transaction(function (tx) {
       var stores = [DOC_STORE, BY_SEQ_STORE, ATTACH_STORE, META_STORE,
         LOCAL_STORE, ATTACH_AND_SEQ_STORE];
@@ -1032,8 +1029,9 @@ function WebSqlPouch(opts, callback) {
   };
 }
 
-WebSqlPouch.valid = valid;
+// in the browser, use a prefix. in Node, don't bother having one
+WebSqlPouch.use_prefix = !!(typeof process === 'undefined' || process.browser);
 
-WebSqlPouch.Changes = new Changes();
+WebSqlPouch.valid = valid;
 
 export default WebSqlPouch;

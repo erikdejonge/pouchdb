@@ -1,5 +1,7 @@
-import collections from 'pouchdb-collections';
+import { Map, Set } from 'pouchdb-collections';
 import { createError, WSQ_ERROR } from '../../deps/errors';
+import createOpenDBFunction from './createOpenDBFunction';
+import valid from './valid';
 
 import {
   BY_SEQ_STORE,
@@ -108,7 +110,7 @@ function compactRevs(revs, docId, tx) {
           digestsToCheck.map(function () { return '?'; }).join(',') +
           ')';
         tx.executeSql(sql, digestsToCheck, function (tx, res) {
-          var nonOrphanedDigests = new collections.Set();
+          var nonOrphanedDigests = new Set();
           for (var i = 0; i < res.rows.length; i++) {
             nonOrphanedDigests.add(res.rows.item(i).digest);
           }
@@ -169,25 +171,9 @@ function getSize(opts) {
   // In Android <=4.3, this value is actually used as an
   // honest-to-god ceiling for data, so we need to
   // set it to a decently high number.
-  var isAndroid = /Android/.test(window.navigator.userAgent);
+  var isAndroid = typeof navigator !== 'undefined' &&
+    /Android/.test(navigator.userAgent);
   return isAndroid ? 5000000 : 1; // in PhantomJS, if you use 0 it will crash
-}
-
-function createOpenDBFunction() {
-  if (typeof sqlitePlugin !== 'undefined') {
-    // The SQLite Plugin started deviating pretty heavily from the
-    // standard openDatabase() function, as they started adding more features.
-    // It's better to just use their "new" format and pass in a big ol'
-    // options object.
-    return sqlitePlugin.openDatabase.bind(sqlitePlugin);
-  }
-
-  if (typeof openDatabase !== 'undefined') {
-    return function openDB(opts) {
-      // Traditional WebSQL API
-      return openDatabase(opts.name, opts.version, opts.description, opts.size);
-    };
-  }
 }
 
 function openDBSafely(openDBFunction, opts) {
@@ -202,26 +188,19 @@ function openDBSafely(openDBFunction, opts) {
   }
 }
 
-var cachedDatabases = {};
+var cachedDatabases = new Map();
 
 function openDB(opts) {
-  var cachedResult = cachedDatabases[opts.name];
+  var cachedResult = cachedDatabases.get(opts.name);
   if (!cachedResult) {
     var openDBFun = createOpenDBFunction();
-    cachedResult = cachedDatabases[opts.name] = openDBSafely(openDBFun, opts);
+    cachedResult = openDBSafely(openDBFun, opts);
+    cachedDatabases.set(opts.name, cachedResult);
     if (cachedResult.db) {
       cachedResult.db._sqlitePlugin = typeof sqlitePlugin !== 'undefined';
     }
   }
   return cachedResult;
-}
-
-function valid() {
-  // SQLitePlugin leaks this global object, which we can use
-  // to detect if it's installed or not. The benefit is that it's
-  // declared immediately, before the 'deviceready' event has fired.
-  return typeof openDatabase !== 'undefined' ||
-    typeof SQLitePlugin !== 'undefined';
 }
 
 export {

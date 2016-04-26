@@ -12,7 +12,7 @@ app.use(bodyParser.json());
 
 var replicationDoc;
 
-function reject(req, res, next) {
+function reject(req, res) {
   replicationDoc = req.body.docs[0];
   res.status(403).send({error: true, message: 'Unauthorized'});
 }
@@ -47,29 +47,29 @@ describe('test.read_only_replication.js', function () {
     var expectedLastSeq;
     var checkpointer;
 
-    return remote.bulkDocs([{_id: 'foo'}, {_id: 'bar'}]).then(function() {
+    return remote.bulkDocs([{_id: 'foo'}, {_id: 'bar'}]).then(function () {
       return db.replicate.from(remoteHTTP);
-    }).then(function(replicationResult) {
+    }).then(function (replicationResult) {
       expectedLastSeq = replicationResult.last_seq;
       checkpointer = new Checkpointer(remoteHTTP, db, replicationDoc._id,
                                       replicationResult);
 
-      return checkpointer.getCheckpoint().then(function(actualLastSeq) {
+      return checkpointer.getCheckpoint().then(function (actualLastSeq) {
         actualLastSeq.should.equal(expectedLastSeq);
       });
-    }).then(function() {
+    }).then(function () {
       return remote.destroy();
-    }).then(function() {
+    }).then(function () {
       // By now, the checkpointer should have marked the source database
       // read-only, and make no other request to read or write a
       // replication log from or rather to it. We therefore expect
       // `checkpointer.getCheckpoint()` to resolve with the same result
       // as previously, even though the source database has now been
       // destroyed.
-      return checkpointer.getCheckpoint().then(function(actualLastSeq) {
+      return checkpointer.getCheckpoint().then(function (actualLastSeq) {
         actualLastSeq.should.equal(expectedLastSeq);
       });
-    }).then(function() {
+    }).then(function () {
       return db.destroy();
     });
   });
