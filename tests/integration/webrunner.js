@@ -9,7 +9,7 @@ var pouchdbSrc = window.location.search.match(/[?&]src=([^&]+)/);
 if (pouchdbSrc) {
   pouchdbSrc = decodeURIComponent(pouchdbSrc[1]);
 } else {
-  pouchdbSrc = '../../dist/pouchdb.js';
+  pouchdbSrc = '../../packages/pouchdb/dist/pouchdb.js';
 }
 var scriptsToLoad = [pouchdbSrc];
 if (preferredAdapters) {
@@ -17,7 +17,8 @@ if (preferredAdapters) {
   preferredAdapters.forEach(function (adapter) {
     if (adapter !== 'websql' && adapter !== 'idb') {
       // load from plugin
-      scriptsToLoad.push('../../dist/pouchdb.' + adapter + '.js');
+      scriptsToLoad.push(
+        '../../packages/pouchdb/dist/pouchdb.' + adapter + '.js');
     }
   });
 }
@@ -134,33 +135,4 @@ function startTests() {
   loadNext();
 }
 
-if (window.cordova) {
-  var hasGrep = window.GREP &&
-      window.location.search.indexOf('grep=') === -1;
-  var hasAutoCompaction = window.AUTO_COMPACTION &&
-    window.location.search.indexOf('autoCompaction') === -1;
-  var hasAdapters = window.ADAPTERS &&
-    window.location.search.indexOf('adapters=') === -1;
-
-  if (hasGrep || hasAutoCompaction || hasAdapters) {
-    var params = [];
-    if (hasGrep) {
-      params.push('grep=' + encodeURIComponent(window.GREP));
-    }
-    if (hasAutoCompaction) {
-      params.push('autoCompaction=' +
-        encodeURIComponent(window.AUTO_COMPACTION));
-    }
-    if (hasAdapters) {
-      params.push('adapters=' + encodeURIComponent(window.ADAPTERS));
-    }
-    window.location.search += (window.location.search ? '&' : '?') +
-      params.join('&');
-  } else {
-    document.addEventListener("deviceready", startTests, false);
-  }
-} else {
-  startTests();
-}
-
-
+startTests();

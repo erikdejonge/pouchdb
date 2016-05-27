@@ -46,7 +46,7 @@ function tests(suiteName, dbName, dbType) {
     }
 
     beforeEach(function () {
-      Promise = PouchDB.utils.Promise;
+      Promise = testUtils.Promise;
       return new PouchDB(dbName).destroy();
     });
     afterEach(function () {
@@ -99,7 +99,7 @@ function tests(suiteName, dbName, dbType) {
         return db.viewCleanup();
       }).then(function () {
         var views = ['name', 'title'];
-        return PouchDB.utils.Promise.all(views.map(function (view) {
+        return testUtils.Promise.all(views.map(function (view) {
           return db.query(view).then(function () {
             throw new Error('expected an error');
           }, function (err) {
@@ -406,13 +406,13 @@ function tests(suiteName, dbName, dbType) {
       }
       return new PouchDB(dbName).then(function (db) {
         return db.bulkDocs({docs : docs}).then(function (responses) {
-          var promise = Promise.resolve();
+          var tasks = [];
           for (var i = 0; i < docs.length; i++) {
             /* jshint loopfunc:true */
             docs[i]._rev = responses[i].rev;
-            promise = promise.then(db.query('view' + i + '/view'));
+            tasks.push(db.query('view' + i + '/view'));
           }
-          return promise;
+          return Promise.all(tasks);
         }).then(function () {
           docs.forEach(function (doc) {
             doc._deleted = true;

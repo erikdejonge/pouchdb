@@ -16,38 +16,21 @@ addons:
   firefox: "41.0.1"
 
 before_install:
-
-  # Install CouchDB Stable
-  - docker run -d -p 3000:5984 klaemo/couchdb:1.6.1
-
-  # Install CouchDB Master
-  - docker run -d -p 3001:5984 klaemo/couchdb:2.0-dev --with-haproxy --with-admin-party-please -n 1
-
   # Because Saucelabs doesnt proxy 5984 on OSX
   - "if [ -z \"$COUCH_HOST\" ]; then export COUCH_HOST=http://127.0.0.1:3000; fi"
 
 before_script:
   - "export DISPLAY=:99.0"
   - "sh -e /etc/init.d/xvfb start"
-
     # Fail early so we dont run hours of saucelabs if we know there
     # is a lint failure
   - npm run eslint
-
-    # set up CORS
-  - "./node_modules/.bin/add-cors-to-couchdb http://127.0.0.1:3000"
-
-    # Configure CORS against master
-  - curl -X PUT http://127.0.0.1:3001/_node/node1@127.0.0.1/_config/httpd/enable_cors -d '"true"'
-  - curl -X PUT http://127.0.0.1:3001/_node/node1@127.0.0.1/_config/cors/origins -d '"*"'
-  - curl -X PUT http://127.0.0.1:3001/_node/node1@127.0.0.1/_config/cors/credentials -d '"true"'
-  - curl -X PUT http://127.0.0.1:3001/_node/node1@127.0.0.1/_config/cors/methods -d '"GET, PUT, POST, HEAD, DELETE"'
-  - curl -X PUT http://127.0.0.1:3001/_node/node1@127.0.0.1/_config/cors/headers -d '"accept, authorization, content-type, origin, referer, x-csrf-token"'
 
 script: npm run $COMMAND
 
 env:
   global:
+  - NPM_CONFIG_PROGRESS="false"
   - secure: "WYQbfTXYwPfqz7t3ycqpXIDQdZ7C9kQJAP+08OF0cuR8eqhm7HxCiu9LjSNqoLAdlDmc55ygeS16Kn3Oht3zZ/i2Y7Gm75HcQfzUIb1sDv1xVm3aQmqZDJfAQ/r7fN8upBCLii/W8IUkJr1k717MpbdsTerIjyfPOb27hw0kJTM="
   - secure: "Ut9pRqzbVJHxg8vt1Cx0bTv4HAroBkvOLjtHF+11f/OzfNnAORIEPnJFHqGbOTozCPOizmzgwvCGqq9gYL8SakrfiI0wBfaL+lk0ub/FPuJ1+hwrLDU0Ju4O5reL0OSu0JB+OTmXfILuRQQkD9/7uwUEbLDFId4phSq3cz1UsK0="
   - secure: "MiufQQKR/EBoS7kcau/I7oYenVilysEqwx37zdgLEKlEUe3SxVOe31uLZv/bhfLNZiRuLAfmIOZmhLGnhMf0LaBzR2yC5qhBxrVHcAiTuS3q6zxpzEf02jnu+hACvj1kJJEPjpOLpEVx7ghWL4McEO0qLbdtSbQlm2IkOX1ONg0="
@@ -57,6 +40,12 @@ env:
   matrix:
   - CLIENT=node COMMAND=test
   - CLIENT=node LEVEL_PREFIX=foo_ COMMAND=test
+
+  # Test in various versions of Node
+  - CLIENT=node NODE_VERSION=0.10 COMMAND=test
+  - CLIENT=node NODE_VERSION=0.11 COMMAND=test
+  - CLIENT=node NODE_VERSION=0.12 COMMAND=test
+  - CLIENT=node NODE_VERSION=stable COMMAND=test
 
   # Test WebSQL in Node (using node-websql)
   - CLIENT=node ADAPTER=websql COMMAND=test
@@ -137,28 +126,9 @@ matrix:
   - env: COMMAND=report-coverage
   - env: CLIENT=selenium:firefox:41.0.1 SERVER=couchdb-master COUCH_HOST=https://$CLOUDANT_USERNAME:$CLOUDANT_PASSWORD@pouch.cloudant.com COMMAND=test
   - env: CLIENT="saucelabs:MicrosoftEdge" COMMAND=test
-  - node_js: "stable"
-    services: docker
-    env: CLIENT=node COMMAND=test
-  - node_js: "0.10"
-    services: docker
-    env: CLIENT=node COMMAND=test
+  - env: CLIENT=selenium:firefox:41.0.1 PERF=1 COMMAND=test
 
   fast_finish: true
-
-  include:
-    - node_js: "0.10"
-      services: docker
-      env: CLIENT=node COMMAND=test
-    - node_js: "0.11"
-      services: docker
-      env: CLIENT=node COMMAND=test
-    - node_js: "0.12"
-      services: docker
-      env: CLIENT=node COMMAND=test
-    - node_js: "stable"
-      services: docker
-      env: CLIENT=node COMMAND=test
 
 branches:
   only:

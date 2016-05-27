@@ -29,7 +29,7 @@ adapters.forEach(function (adapters) {
 
     it('retry stuff', function (done) {
       var remote = new PouchDB(dbs.remote);
-      var Promise = PouchDB.utils.Promise;
+      var Promise = testUtils.Promise;
       var allDocs = remote.allDocs;
 
       // Reject attempting to write 'foo' 3 times, then let it succeed
@@ -151,7 +151,7 @@ adapters.forEach(function (adapters) {
 
       var db = new PouchDB(dbs.name);
       var remote = new PouchDB(dbs.remote);
-      var Promise = PouchDB.utils.Promise;
+      var Promise = testUtils.Promise;
 
       var origGet = remote.get;
       var i = 0;
@@ -223,7 +223,7 @@ adapters.forEach(function (adapters) {
 
       var db = new PouchDB(dbs.name);
       var remote = new PouchDB(dbs.remote);
-      var Promise = PouchDB.utils.Promise;
+      var Promise = testUtils.Promise;
 
       var origGet = remote.get;
       var i = 0;
@@ -306,7 +306,7 @@ adapters.forEach(function (adapters) {
 
         var db = new PouchDB(dbs.name);
         var remote = new PouchDB(dbs.remote);
-        var Promise = PouchDB.utils.Promise;
+        var Promise = testUtils.Promise;
 
         var origGet = remote.get;
         var i = 0;
@@ -379,7 +379,7 @@ adapters.forEach(function (adapters) {
 
       var db = new PouchDB(dbs.name);
       var remote = new PouchDB(dbs.remote);
-      var Promise = PouchDB.utils.Promise;
+      var Promise = testUtils.Promise;
 
       var origGet = remote.get;
       var i = 0;
@@ -451,7 +451,7 @@ adapters.forEach(function (adapters) {
       this.timeout(200000);
       var db = new PouchDB(dbs.name);
       var remote = new PouchDB(dbs.remote);
-      var Promise = PouchDB.utils.Promise;
+      var Promise = testUtils.Promise;
 
       var flunked = 0;
       var origGet = remote.get;
@@ -542,11 +542,14 @@ adapters.forEach(function (adapters) {
 
     it('4049 retry while starting offline', function (done) {
 
-      var ajax = PouchDB.utils.ajax;
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      var ajax = remote._ajax;
       var _called = 0;
       var startFailing = false;
 
-      PouchDB.utils.ajax = function (opts, cb) {
+      remote._ajax = function (opts, cb) {
         if (!startFailing || ++_called > 3) {
           ajax.apply(this, arguments);
         } else {
@@ -554,20 +557,69 @@ adapters.forEach(function (adapters) {
         }
       };
 
-      var db = new PouchDB(dbs.name);
-      var remote = new PouchDB(dbs.remote);
-
       remote.post({a: 'doc'}).then(function () {
         startFailing = true;
         var rep = db.replicate.from(remote, {live: true, retry: true})
           .on('change', function () { rep.cancel(); });
 
         rep.on('complete', function () {
-          PouchDB.utils.ajax = ajax;
+          remote._ajax = ajax;
           done();
         });
       });
 
+    });
+
+    it('#5157 replicate many docs with live+retry', function () {
+      var Promise = testUtils.Promise;
+      var numDocs = 512; // uneven number
+      var docs = [];
+      for (var i = 0; i < numDocs; i++) {
+        // mix of generation-1 and generation-2 docs
+        if (i % 2 === 0) {
+          docs.push({
+            _id: testUtils.uuid(),
+            _rev: '1-x',
+            _revisions: { start: 1, ids: ['x'] }
+          });
+        } else {
+          docs.push({
+            _id: testUtils.uuid(),
+            _rev: '2-x',
+            _revisions: { start: 2, ids: ['x', 'y'] }
+          });
+        }
+      }
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+      return db.bulkDocs({
+        docs: docs,
+        new_edits: false
+      }).then(function () {
+        function replicatePromise(fromDB, toDB) {
+          return new Promise(function (resolve, reject) {
+            var replication = fromDB.replicate.to(toDB, {
+              live: true,
+              retry: true,
+              batches_limit: 10,
+              batch_size: 20
+            }).on('paused', function (err) {
+              if (!err) {
+                replication.cancel();
+              }
+            }).on('complete', resolve)
+              .on('error', reject);
+          });
+        }
+        return Promise.all([
+          replicatePromise(db, remote),
+          replicatePromise(remote, db)
+        ]);
+      }).then(function () {
+        return remote.info();
+      }).then(function (info) {
+        info.doc_count.should.equal(numDocs);
+      });
     });
 
   });
