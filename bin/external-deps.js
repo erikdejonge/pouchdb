@@ -6,13 +6,15 @@
 
 module.exports = [
   // main deps
-  'argsarray', 'debug', 'double-ended-queue', 'es3ify', 'fruitdown',
-  'inherits', 'js-extend', 'level-write-stream', 'levelup', 'lie',
-  'localstorage-down', 'memdown', 'pouchdb-collate', 'pouchdb-collections',
-  'request', 'scope-eval', 'spark-md5', 'sublevel-pouchdb', 'through2',
+  'argsarray', 'debug', 'double-ended-queue', 'es3ify', 'es6-promise-pool',
+  'fruitdown', 'inherits', 'js-extend', 'level-write-stream', 'levelup', 'lie',
+  'localstorage-down', 'memdown', 'pouchdb-collate',
+  'request', 'scope-eval', 'spark-md5', 'through2',
   'vuvuzela', 'leveldown', 'websql',
   // core node deps
   'fs', 'crypto', 'events', 'path',
+  // sublevel-pouchdb
+  'level-codec', 'ltgt', 'pull-stream', 'readable-stream',
   // pouchdb itself ( for the levelalt adapters )
   'pouchdb'
 ];

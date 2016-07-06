@@ -2,9 +2,11 @@ import Promise from 'pouchdb-promise';
 import getArguments from 'argsarray';
 import {
   clone,
+  listenerCount,
   once,
   parseDdocFunctionName,
-  normalizeDdocFunctionName
+  normalizeDdocFunctionName,
+  guardedConsole
 } from 'pouchdb-utils';
 import {
   isDeleted,
@@ -25,6 +27,15 @@ import {
 
 inherits(Changes, EE);
 
+function tryCatchInChangeListener(self, change) {
+  // isolate try/catches to avoid V8 deoptimizations
+  try {
+    self.emit('change', change);
+  } catch (e) {
+    guardedConsole('error', 'Error in .on("change", function):', e);
+  }
+}
+
 function Changes(db, opts, callback) {
   EE.call(this);
   var self = this;
@@ -32,7 +43,9 @@ function Changes(db, opts, callback) {
   opts = opts ? clone(opts) : {};
   var complete = opts.complete = once(function (err, resp) {
     if (err) {
-      self.emit('error', err);
+      if (listenerCount(self, 'error') > 0) {
+        self.emit('error', err);
+      }
     } else {
       self.emit('complete', resp);
     }
@@ -55,7 +68,7 @@ function Changes(db, opts, callback) {
     if (opts.isCancelled) {
       return;
     }
-    self.emit('change', change);
+    tryCatchInChangeListener(self, change);
     if (self.startSeq && self.startSeq <= change.seq) {
       self.startSeq = false;
     }
@@ -83,8 +96,10 @@ function Changes(db, opts, callback) {
 
 
   if (!db.taskqueue.isReady) {
-    db.taskqueue.addTask(function () {
-      if (self.isCancelled) {
+    db.taskqueue.addTask(function (failed) {
+      if (failed) {
+        opts.complete(failed);
+      } else if (self.isCancelled) {
         self.emit('cancel');
       } else {
         self.doChanges(opts);
@@ -166,6 +181,10 @@ Changes.prototype.doChanges = function (opts) {
     });
   }
 
+  if (opts.view && !opts.filter) {
+    opts.filter = '_view';
+  }
+
   if (opts.filter && typeof opts.filter === 'string') {
     if (opts.filter === '_view') {
       opts.view = normalizeDdocFunctionName(opts.view);
@@ -186,6 +205,7 @@ Changes.prototype.doChanges = function (opts) {
   opts.limit = opts.limit === 0 ? 1 : opts.limit;
   opts.complete = callback;
   var newPromise = this.db._changes(opts);
+  /* istanbul ignore else */
   if (newPromise && typeof newPromise.cancel === 'function') {
     var cancel = self.cancel;
     self.cancel = getArguments(function (args) {

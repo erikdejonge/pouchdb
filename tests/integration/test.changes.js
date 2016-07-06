@@ -256,12 +256,9 @@ adapters.forEach(function (adapter) {
           limit: 2,
           include_docs: true
         }).on('error', function (err) {
+          err.name.should.equal('not_found');
           err.status.should.equal(testUtils.errors.MISSING_DOC.status,
                                   'correct error status returned');
-          err.message.should.equal(testUtils.errors.MISSING_DOC.message,
-                               'correct error message returned');
-          // todo: does not work in pouchdb-server.
-          // err.reason.should.equal('missing json key: odd');
           done();
         });
       });
@@ -291,10 +288,7 @@ adapters.forEach(function (adapter) {
         }).on('error', function (err) {
           err.status.should.equal(testUtils.errors.MISSING_DOC.status,
                                   'correct error status returned');
-          err.message.should.equal(testUtils.errors.MISSING_DOC.message,
-                               'correct error message returned');
-          // todo: does not work in pouchdb-server.
-          // err.reason.should.equal('missing json key: filters');
+          err.name.should.equal('not_found');
           done();
         });
       });
@@ -411,10 +405,7 @@ adapters.forEach(function (adapter) {
         }).on('error', function (err) {
           err.status.should.equal(testUtils.errors.MISSING_DOC.status,
                                   'correct error status returned');
-          err.message.should.equal(testUtils.errors.MISSING_DOC.message,
-                               'correct error message returned');
-          // todo: does not work in pouchdb-server.
-          // err.reason.should.equal('missing json key: odd');
+          err.name.should.equal('not_found');
           done();
         });
       });
@@ -437,11 +428,7 @@ adapters.forEach(function (adapter) {
         }).on('error', function (err) {
           err.status.should.equal(testUtils.errors.MISSING_DOC.status,
                                   'correct error status returned');
-          err.message.should.equal(testUtils.errors.MISSING_DOC.message,
-                               'correct error message returned');
-          // todo: does not work in pouchdb-server.
-          // err.reason.should.equal('missing json key: views',
-          //                         'correct error reason returned');
+          err.name.should.equal('not_found');
           done();
         });
       });
@@ -474,12 +461,12 @@ adapters.forEach(function (adapter) {
             throw new Error(); // syntaxerrors can't be caught either.
           }.toString()
         }
+      }).should.eventually.be.fulfilled.then(function () {
+        return db.changes({filter: 'test/test'}).should.eventually.be.rejected;
       }).then(function () {
-        db.changes({filter: 'test/test'}).then(function () {
-          done('should have thrown');
-        }).catch(function () {
-          done();
-        });
+        done();
+      }).catch(function (err) {
+        done('We had an error - ' + err);
       });
     });
 
@@ -501,12 +488,7 @@ adapters.forEach(function (adapter) {
         }).on('error', function (err) {
           err.status.should.equal(testUtils.errors.BAD_REQUEST.status,
                                   'correct error status returned');
-          err.message.should.equal(testUtils.errors.BAD_REQUEST.message,
-                               'correct error message returned');
-          // todo: does not work in pouchdb-server.
-          // err.reason.should
-          //   .equal('`view` filter parameter is not provided.',
-          //          'correct error reason returned');
+          err.name.should.equal('bad_request');
           done();
         });
       });
@@ -560,6 +542,29 @@ adapters.forEach(function (adapter) {
             }).on('error', done);
           });
         });
+      });
+    });
+
+    it('#3609 view option implies filter: _view', function () {
+      var docs = [
+        {_id: '0', integer: 0},
+        {_id: '1', integer: 1},
+        {_id: '2', integer: 2},
+        {_id: '_design/foo', integer: 3,
+         views: {
+           even: {
+             map: 'function (doc) { if (doc.integer % 2 === 1) ' +
+               '{ emit(doc._id, null) }; }'
+           }
+         }
+        }
+      ];
+
+      var db = new PouchDB(dbs.name);
+      return db.bulkDocs(docs).then(function () {
+        return db.changes({view: 'foo/even'});
+      }).then(function (changes) {
+        changes.results.length.should.equal(2);
       });
     });
 
@@ -2110,45 +2115,45 @@ adapters.forEach(function (adapter) {
         {_id: '2', integer: 11},
         {_id: '3', integer: 12}
       ];
-      new PouchDB(dbs.name).then(function (localdb) {
-        var remotedb = new PouchDB(dbs.remote);
-        return localdb.bulkDocs({ docs: docs1 }).then(function (info) {
-          docs2[0]._rev = info[2].rev;
-          docs2[1]._rev = info[3].rev;
-          return localdb.put(docs2[0]).then(function () {
-            return localdb.put(docs2[1]).then(function (info) {
-              var rev2 = info.rev;
-              return PouchDB.replicate(localdb, remotedb).then(function () {
-                // update remote once, local twice, then replicate from
-                // remote to local so the remote losing conflict is later in
-                // the tree
-                return localdb.put({
+      var localdb = new PouchDB(dbs.name);
+      var remotedb = new PouchDB(dbs.remote);
+      return localdb.bulkDocs({ docs: docs1 }).then(function (info) {
+        docs2[0]._rev = info[2].rev;
+        docs2[1]._rev = info[3].rev;
+        return localdb.put(docs2[0]).then(function () {
+          return localdb.put(docs2[1]).then(function (info) {
+            var rev2 = info.rev;
+            return PouchDB.replicate(localdb, remotedb).then(function () {
+              // update remote once, local twice, then replicate from
+              // remote to local so the remote losing conflict is later in
+              // the tree
+              return localdb.put({
+                _id: '3',
+                _rev: rev2,
+                integer: 20
+              }).then(function (resp) {
+                var rev3Doc = {
                   _id: '3',
-                  _rev: rev2,
-                  integer: 20
-                }).then(function (resp) {
-                  var rev3Doc = {
+                  _rev: resp.rev,
+                  integer: 30
+                };
+                return localdb.put(rev3Doc).then(function (resp) {
+                  var rev4local = resp.rev;
+                  var rev4Doc = {
                     _id: '3',
-                    _rev: resp.rev,
-                    integer: 30
+                    _rev: rev2,
+                    integer: 100
                   };
-                  return localdb.put(rev3Doc).then(function (resp) {
-                    var rev4local = resp.rev;
-                    var rev4Doc = {
-                      _id: '3',
-                      _rev: rev2,
-                      integer: 100
-                    };
-                    return remotedb.put(rev4Doc).then(function (resp) {
-                      var remoterev = resp.rev;
-                      return PouchDB.replicate(remotedb, localdb).then(
-                        function () {
+                  return remotedb.put(rev4Doc).then(function (resp) {
+                    var remoterev = resp.rev;
+                    return PouchDB.replicate(remotedb, localdb).then(
+                      function () {
                         return localdb.changes({
                           include_docs: true,
                           style: 'all_docs',
                           conflicts: true
                         }).on('error', testDone)
-                        .then(function (changes) {
+                          .then(function (changes) {
                             changes.results.length.should.equal(4);
                             var ch = findById(changes.results, '3');
                             ch.changes.length.should.equal(2);
@@ -2164,7 +2169,6 @@ adapters.forEach(function (adapter) {
                             ch.doc._conflicts[0].should.equal(remoterev);
                           });
                       });
-                    });
                   });
                 });
               });
@@ -2519,6 +2523,35 @@ adapters.forEach(function (adapter) {
         db.bulkDocs({ docs: docs2 });
       });
     });
+
+
+    it('#3539 - Exception in changes is fine', function (done) {
+
+      var db = new PouchDB(dbs.name);
+      var count = 0;
+
+      var changes = db.changes({live: true});
+
+      changes.on('change', function () {
+        ++count;
+        if (count === 1) {
+          throw new Error('an error');
+        } else if (count === 3) {
+          changes.cancel();
+        }
+      });
+
+      changes.on('complete', function () {
+        done();
+      });
+
+      db.post({ test: 'some stuff' }).then(function () {
+        return db.post({ test: 'more stuff' });
+      }).then(function () {
+        db.post({ test: 'and more stuff' });
+      });
+    });
+
   });
 });
 

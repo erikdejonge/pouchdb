@@ -455,31 +455,30 @@ adapters.forEach(function (adapter) {
     });
 
     it('#3062 bulkDocs with staggered seqs', function () {
-      return new PouchDB(dbs.name).then(function (db) {
-        var docs = [];
-        for (var i = 10; i <= 20; i++) {
-          docs.push({ _id: 'doc-' + i});
-        }
-        return db.bulkDocs({docs: docs}).then(function (infos) {
-          docs.forEach(function (doc, i) {
-            doc._rev = infos[i].rev;
-          });
-          var docsToUpdate = docs.filter(function (doc, i) {
-            return i % 2 === 1;
-          });
-          docsToUpdate.reverse();
-          return db.bulkDocs({docs: docsToUpdate});
-        }).then(function (infos) {
-          infos.map(function (x) {
-            return {id: x.id, error: !!x.error, rev: (typeof x.rev)};
-          }).should.deep.equal([
-            { error: false, id: 'doc-19', rev: 'string'},
-            { error: false, id: 'doc-17', rev: 'string'},
-            { error: false, id: 'doc-15', rev: 'string'},
-            { error: false, id: 'doc-13', rev: 'string'},
-            { error: false, id: 'doc-11', rev: 'string'}
-          ]);
+      var db = new PouchDB(dbs.name);
+      var docs = [];
+      for (var i = 10; i <= 20; i++) {
+        docs.push({ _id: 'doc-' + i});
+      }
+      return db.bulkDocs({docs: docs}).then(function (infos) {
+        docs.forEach(function (doc, i) {
+          doc._rev = infos[i].rev;
         });
+        var docsToUpdate = docs.filter(function (doc, i) {
+          return i % 2 === 1;
+        });
+        docsToUpdate.reverse();
+        return db.bulkDocs({docs: docsToUpdate});
+      }).then(function (infos) {
+        infos.map(function (x) {
+          return {id: x.id, error: !!x.error, rev: (typeof x.rev)};
+        }).should.deep.equal([
+          { error: false, id: 'doc-19', rev: 'string'},
+          { error: false, id: 'doc-17', rev: 'string'},
+          { error: false, id: 'doc-15', rev: 'string'},
+            { error: false, id: 'doc-13', rev: 'string'},
+          { error: false, id: 'doc-11', rev: 'string'}
+        ]);
       });
     });
 
@@ -733,13 +732,9 @@ adapters.forEach(function (adapter) {
       }, { new_edits: false }, function () {
         db.get('foo', function (err) {
           should.exist(err, 'deleted');
+          err.name.should.equal('not_found');
           err.status.should.equal(testUtils.errors.MISSING_DOC.status,
                                    'correct error status returned');
-          err.message.should.equal(testUtils.errors.MISSING_DOC.message,
-                                   'correct error message returned');
-          // todo: does not work in pouchdb-server.
-          // err.reason.should.equal('deleted',
-          //                          'correct error reason returned');
           done();
         });
       });
@@ -1009,12 +1004,12 @@ adapters.forEach(function (adapter) {
       }
 
       var revs = [];
-      db.put({v: 1}, 'doc').then(function (v1) {
+      db.put({_id: 'doc', v: 1}).then(function (v1) {
         revs.push(v1.rev);
-        return db.put({v: 2}, 'doc', revs[0]);
+        return db.put({_id: 'doc', _rev: revs[0], v: 2});
       }).then(function (v2) {
         revs.push(v2.rev);
-        return db.put({v: 3}, 'doc', revs[1]);
+        return db.put({_id: 'doc', _rev: revs[1], v: 3});
       }).then(function () {
         // the v2 revision is still in the db
         return db.get('doc', {rev: revs[1]});

@@ -38,10 +38,15 @@ function buildModule(filepath) {
     // bundled into one index.js. so we don't want to externalize
     // the pouchdb repos
     depsToSkip = depsToSkip.filter(function (dep) {
-      return !/^pouchdb/.test(dep);
+      return !/pouchdb/.test(dep);
     }).concat(externalDeps.filter(function (dep) {
       return dep !== 'pouchdb'; // don't exclude pouchdb itself
     }));
+  }
+
+  if (pkg.browser && pkg.browser['./lib/index.js'] !== './lib/index-browser.js') {
+    return Promise.reject(new Error(pkg.name +
+      ' is missing a "lib/index.js" entry in the browser field'));
   }
 
   // browser & node vs one single vanilla version

@@ -183,11 +183,11 @@ function LevelPouch(opts, callback) {
       db = dbStore.get(name);
       db._docCount  = -1;
       db._queue = new Deque();
-      /* istanbul ignore if */
-      if (opts.noMigrate || (opts.db && !opts.migrate)) {
-        afterDBCreated();
-      } else {
+      /* istanbul ignore else */
+      if (opts.migrate) { // migration for leveldown
         migrate.toSublevel(name, db, afterDBCreated);
+      } else {
+        afterDBCreated();
       }
     })));
   }
@@ -562,11 +562,16 @@ function LevelPouch(opts, callback) {
     }
 
     function finish() {
-      if (api.auto_compaction) {
-        return autoCompact(complete);
-      } else {
-        compact(stemmedRevs, complete);
-      }
+      compact(stemmedRevs, function (error) {
+        /* istanbul ignore if */
+        if (error) {
+          complete(error);
+        }
+        if (api.auto_compaction) {
+          return autoCompact(complete);
+        }
+        complete();
+      });
     }
 
     function writeDoc(docInfo, winningRev, winningRevIsDeleted, newRevIsDeleted,

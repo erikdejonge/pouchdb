@@ -2,6 +2,7 @@
 /* jshint -W079 */
 'use strict';
 
+var path = require('path');
 var testUtils = {};
 
 function uniq(list) {
@@ -281,6 +282,47 @@ testUtils.makeBlob = function (data, type) {
   }
 };
 
+testUtils.getUnHandledRejectionEventName = function () {
+  return typeof window !== 'undefined' ? 'unhandledrejection' :
+    'unhandledRejection';
+};
+
+testUtils.addGlobalEventListener = function (eventName, listener) {
+  // The window test has to go first because the process test will pass
+  // in the browser's test environment
+  if (typeof window !== 'undefined' && window.addEventListener) {
+    return window.addEventListener(eventName, listener);
+  }
+
+  if (typeof process !== 'undefined') {
+    return process.on(eventName, listener);
+  }
+
+  return null;
+};
+
+testUtils.addUnhandledRejectionListener = function (listener) {
+  return testUtils.addGlobalEventListener(
+    testUtils.getUnHandledRejectionEventName(), listener);
+};
+
+testUtils.removeGlobalEventListener = function (eventName, listener) {
+  if (typeof process !== 'undefined') {
+    return process.removeListener(eventName, listener);
+  }
+
+  if (typeof window !== 'undefined' && window.removeEventListener) {
+    return window.removeEventListener(eventName, listener);
+  }
+
+  return null;
+};
+
+testUtils.removeUnhandledRejectionListener = function (listener) {
+  return testUtils.removeGlobalEventListener(
+    testUtils.getUnHandledRejectionEventName(), listener);
+};
+
 if (typeof process !== 'undefined' && !process.browser) {
   if (process.env.COVERAGE) {
     global.PouchDB = require('../../packages/pouchdb-for-coverage');
@@ -313,11 +355,15 @@ if (typeof process !== 'undefined' && !process.browser) {
     // (the two strings are just to fool Browserify because sqlite3 fails
     // in Node 0.11-0.12)
     require('../../packages/' + 'pouchdb/extras/websql');
-    global.PouchDB = global.PouchDB.defaults({prefix: './tmp/_pouch_'});
-    global.PouchDB.preferredAdapters = ['websql'];
+    global.PouchDB.preferredAdapters = ['websql', 'leveldb'];
+    global.PouchDB = global.PouchDB.defaults({
+      prefix: path.resolve('./tmp/_pouch_')
+    });
   } else {
     // test regular leveldown in node
-    global.PouchDB = global.PouchDB.defaults({prefix: './tmp/_pouch_'});
+    global.PouchDB = global.PouchDB.defaults({
+      prefix: path.resolve('./tmp/_pouch_')
+    });
   }
 
   require('mkdirp').sync('./tmp');

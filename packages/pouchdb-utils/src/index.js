@@ -2,6 +2,7 @@ import adapterFun from './adapterFun';
 import bulkGetShim from './bulkGetShim';
 import changesHandler from './changesHandler';
 import clone from './clone';
+import guardedConsole from './guardedConsole';
 import defaultBackOff from './defaultBackOff';
 import explainError from './explainError';
 import extend from './extend';
@@ -12,6 +13,7 @@ import hasLocalStorage from './env/hasLocalStorage';
 import invalidIdError from './invalidIdError';
 import isChromeApp from './env/isChromeApp';
 import isCordova from './isCordova';
+import listenerCount from './listenerCount';
 import normalizeDdocFunctionName from './normalizeDdocFunctionName';
 import once from './once';
 import parseDdocFunctionName from './parseDdocFunctionName';
@@ -32,10 +34,12 @@ export {
   filterChange,
   flatten,
   functionName,
+  guardedConsole,
   hasLocalStorage,
   invalidIdError,
   isChromeApp,
   isCordova,
+  listenerCount,
   normalizeDdocFunctionName,
   once,
   parseDdocFunctionName,

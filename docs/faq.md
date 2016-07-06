@@ -16,7 +16,6 @@ There are a number of databases that implement a CouchDB-like protocol, and Pouc
  * [CouchDB](http://couchdb.apache.org/) &ndash; CouchDB is our primary reference database and is used for automated testing.
  * [Cloudant](https://cloudant.com/) &ndash; A cluster-aware fork of CouchDB.
  * [Couchbase Sync Gateway](http://www.couchbase.com/communities/couchbase-sync-gateway) &ndash; A sync gateway for Couchbase.
- * [IrisCouch](http://iriscouch.com/) &ndash; CouchDB in the cloud.
  * [PouchDB Server](https://github.com/pouchdb/pouchdb-server) &ndash; An HTTP API written on top of PouchDB. Additionally, it supports alternate backends like in-memory, Redis, Riak and MySQL via [the LevelUP ecosystem](https://github.com/rvagg/node-levelup/wiki/Modules#storage). Note that your application must use the PouchDB API rather than directly modifying the database, however.
 
 {% include anchor.html class="h3" title="The web is nice, but I want to build a native app?" hash="native_support" %}
@@ -48,6 +47,8 @@ In **Firefox**, PouchDB uses IndexedDB. Though Firefox has no upper limit beside
 **Internet Exporer 10+** has a hard 250MB limit, and will prompt the user with a non-modal dialog at 10MB.
 
 **Mobile Safari** on iOS has a hard 50MB limit, whereas **desktop Safari** has no limit. Both will prompt the user with a modal dialog if an application requests more than 5MB of data, at increments of 5MB, 10MB, 50MB, 100MB, etc. Some versions of Safari have a bug where they only let you request additional storage once, so you'll need to request the desired space up-front. PouchDB allows you to do this using [the `size` option](http://pouchdb.com/api.html#create_database).
+
+**iOS Web Application**, a page saved on the homescreen behaves different than apps in Mobile Safari (at least from iOS 9.3.2+). No specifics are published online by Apple, but WebSQL storage seems not limited to 50mb and there will not be any prompts when requesting data storage. Use [`<meta name="apple-mobile-web-app-capable" content="yes">`](https://developer.apple.com/library/ios/documentation/AppleApplications/Reference/SafariWebContent/ConfiguringWebApplications/ConfiguringWebApplications.html#//apple_ref/doc/uid/TP40002051-CH3-SW3) in your html header and use *Add to Home Screen* in the share menu of Safari. Please note, IndexedDB is not available, so FruitDown won't work. It seems there is different behaviour for different models of iPad and iPhone. You can check your mileage using the [storage abuser](http://demo.agektmr.com/storage/), which you can *Add to Home Screen* on your device. **Caveat**: when iOS is running low on storage space, the OS might decide to delete all data without any notice or warning to the end user. Be sure to use devices with plenty of spare space, or your users will lose unsynced data.
 
 **Android** works the same as Chrome as of 4.4+ (IndexedDB), while older versions can store up to 200MB (WebSQL).
 

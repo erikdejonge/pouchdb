@@ -2,15 +2,8 @@ import debug from 'debug';
 import inherits from 'inherits';
 import Adapter from './adapter';
 import TaskQueue from './taskqueue';
-import Promise from 'pouchdb-promise';
 import { clone } from 'pouchdb-utils';
-
-function defaultCallback(err) {
-  /* istanbul ignore next */
-  if (err && global.debug) {
-    console.error(err);
-  }
-}
+import parseAdapter from './parseAdapter';
 
 // OK, so here's the deal. Consider this code:
 //     var db1 = new PouchDB('foo');
@@ -22,8 +15,8 @@ function defaultCallback(err) {
 // responsible for emitting the initial event, which then gets emitted
 // by the constructor, which then broadcasts it to any other dbs
 // that may have been created with the same name.
-function prepareForDestruction(self, opts) {
-  var name = opts.originalName;
+function prepareForDestruction(self) {
+  var name = self._db_name;
   var ctor = self.constructor;
   var destructionListeners = ctor._destructionListeners;
 
@@ -46,128 +39,62 @@ function prepareForDestruction(self, opts) {
 }
 
 inherits(PouchDB, Adapter);
-function PouchDB(name, opts, callback) {
-
+function PouchDB(name, opts) {
+  // In Node our test suite only tests this for PouchAlt unfortunately
+  /* istanbul ignore if */
   if (!(this instanceof PouchDB)) {
-    return new PouchDB(name, opts, callback);
+    return new PouchDB(name, opts);
   }
+
   var self = this;
-  if (typeof opts === 'function' || typeof opts === 'undefined') {
-    callback = opts;
-    opts = {};
-  }
+  opts = opts || {};
 
   if (name && typeof name === 'object') {
     opts = name;
-    name = undefined;
+    name = opts.name;
+    delete opts.name;
   }
-  if (typeof callback === 'undefined') {
-    callback = defaultCallback;
-  }
-  name = name || opts.name;
-  opts = clone(opts);
-  // if name was specified via opts, ignore for the sake of dependentDbs
-  delete opts.name;
-  this.__opts = opts;
-  var oldCB = callback;
+
+  this.__opts = opts = clone(opts);
+
   self.auto_compaction = opts.auto_compaction;
   self.prefix = PouchDB.prefix;
+
+  if (typeof name !== 'string') {
+    throw new Error('Missing/invalid DB name');
+  }
+
+  var prefixedName = (opts.prefix || '') + name;
+  var backend = parseAdapter(prefixedName, opts);
+
+  opts.name = backend.name;
+  opts.adapter = opts.adapter || backend.adapter;
+
+  self._db_name = name;
+  self._adapter = opts.adapter;
+  debug('pouchdb:adapter')('Picked adapter: ' + opts.adapter);
+
+  if (!PouchDB.adapters[opts.adapter] ||
+      !PouchDB.adapters[opts.adapter].valid()) {
+    throw new Error('Invalid Adapter: ' + opts.adapter);
+  }
+
   Adapter.call(self);
   self.taskqueue = new TaskQueue();
-  var promise = new Promise(function (fulfill, reject) {
-    callback = function (err, resp) {
-      /* istanbul ignore if */
-      if (err) {
-        return reject(err);
-      }
-      delete resp.then;
-      fulfill(resp);
-    };
-  
-    opts = clone(opts);
-    var originalName = opts.name || name;
-    var backend, error;
-    (function () {
-      try {
 
-        if (typeof originalName !== 'string') {
-          error = new Error('Missing/invalid DB name');
-          error.code = 400;
-          throw error;
-        }
+  self.adapter = opts.adapter;
 
-        backend = PouchDB.parseAdapter(originalName, opts);
-        
-        opts.originalName = originalName;
-        opts.name = backend.name;
-        if (opts.prefix && backend.adapter !== 'http' &&
-            backend.adapter !== 'https') {
-          opts.name = opts.prefix + opts.name;
-        }
-        opts.adapter = opts.adapter || backend.adapter;
-        self._adapter = opts.adapter;
-        debug('pouchdb:adapter')('Picked adapter: ' + opts.adapter);
-
-        self._db_name = originalName;
-        if (!PouchDB.adapters[opts.adapter]) {
-          error = new Error('Adapter is missing');
-          error.code = 404;
-          throw error;
-        }
-
-        /* istanbul ignore if */
-        if (!PouchDB.adapters[opts.adapter].valid()) {
-          error = new Error('Invalid Adapter');
-          error.code = 404;
-          throw error;
-        }
-      } catch (err) {
-        self.taskqueue.fail(err);
-      }
-    }());
-    if (error) {
-      return reject(error); // constructor error, see above
+  PouchDB.adapters[opts.adapter].call(self, opts, function (err) {
+    if (err) {
+      return self.taskqueue.fail(err);
     }
-    self.adapter = opts.adapter;
+    prepareForDestruction(self);
 
-    // needs access to PouchDB;
-    self.replicate = {};
-
-    self.replicate.from = function (url, opts, callback) {
-      return self.constructor.replicate(url, self, opts, callback);
-    };
-
-    self.replicate.to = function (url, opts, callback) {
-      return self.constructor.replicate(self, url, opts, callback);
-    };
-
-    self.sync = function (dbName, opts, callback) {
-      return self.constructor.sync(self, dbName, opts, callback);
-    };
-
-    self.replicate.sync = self.sync;
-
-    PouchDB.adapters[opts.adapter].call(self, opts, function (err) {
-      /* istanbul ignore if */
-      if (err) {
-        self.taskqueue.fail(err);
-        callback(err);
-        return;
-      }
-      prepareForDestruction(self, opts);
-
-      self.emit('created', self);
-      PouchDB.emit('created', opts.originalName);
-      self.taskqueue.ready(self);
-      callback(null, self);
-    });
-
+    self.emit('created', self);
+    PouchDB.emit('created', self._db_name);
+    self.taskqueue.ready(self);
   });
-  promise.then(function (resp) {
-    oldCB(null, resp);
-  }, oldCB);
-  self.then = promise.then.bind(promise);
-  self.catch = promise.catch.bind(promise);
+
 }
 
 PouchDB.debug = debug;
