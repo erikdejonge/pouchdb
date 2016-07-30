@@ -1174,6 +1174,12 @@ adapters.forEach(function (adapters) {
     it('Test _conflicts key', function (done) {
       var db = new PouchDB(dbs.name);
       var remote = new PouchDB(dbs.remote);
+
+      // Test invalid if adapter doesnt support mapreduce
+      if (!remote.query) {
+        return done();
+      }
+
       var doc1 = {_id: 'adoc', foo: 'bar'};
       var doc2 = {_id: 'adoc', bar: 'baz'};
       var ddoc = {
@@ -1589,6 +1595,37 @@ adapters.forEach(function (adapters) {
         remote.changes = changes;
       }).catch(function (err) {
         remote.changes = changes;
+        throw err;
+      });
+    });
+
+    it('Does not update checkpoint unncessarily (#5379)', function () {
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+      var bulkDocs = remote.bulkDocs;
+      var bulkDocsCalled = false;
+      remote.bulkDocs = function () {
+        bulkDocsCalled = true;
+        return bulkDocs.apply(this, arguments);
+      };
+      return remote.bulkDocs({ docs: docs }).then(function () {
+        return db.replicate.from(remote);
+      }).then(function (result) {
+        result.ok.should.equal(true);
+        bulkDocsCalled = false;
+
+        // kick off a second replication where there are no changes
+        // checkpoints are written using bulkDocs so
+        // we don't expect any calls
+        return db.replicate.from(remote);
+      }).then(function (result) {
+        result.ok.should.equal(true);
+        bulkDocsCalled.should.equal(false);
+      }).then(function () {
+        // Restore remote.bulkDocs to original
+        remote.bulkDocs = bulkDocs;
+      }).catch(function (err) {
+        remote.bulkDocs = bulkDocs;
         throw err;
       });
     });
@@ -3223,7 +3260,6 @@ adapters.forEach(function (adapters) {
     });
 
     it('doc count after multiple replications', function (done) {
-
       var runs = 2;
       // helper. remove each document in db and bulk load docs into same
       function rebuildDocuments(db, docs, callback) {
@@ -3303,6 +3339,11 @@ adapters.forEach(function (adapters) {
           }
         ];
         var dbr = new PouchDB(remote);
+        // Test invalid if adapter doesnt support mapreduce
+        if (!dbr.query) {
+          return done();
+        }
+
         rebuildDocuments(dbr, docs, function () {
           var db = new PouchDB(name);
           db.replicate.from(remote, function () {
@@ -4327,42 +4368,6 @@ adapters.forEach(function (adapters) {
       db.post({a: 'doc'});
     });
 
-    it('#4276 Triggers paused error', function (done) {
-
-      if (!(/http/.test(dbs.remote) && !/http/.test(dbs.name))) {
-        return done();
-      }
-
-      var err = {
-        "message": "_writer access is required for this request",
-        "name": "unauthorized",
-        "status": 401
-      };
-
-      var db = new PouchDB(dbs.name);
-      var remote = new PouchDB(dbs.remote);
-
-      var ajax = remote._ajax;
-      remote._ajax = function (opts, cb) {
-        cb(err);
-      };
-
-      db.bulkDocs([{foo: 'bar'}]).then(function () {
-
-        var repl = db.replicate.to(remote, {live: true, retry: true});
-
-        repl.on('paused', function (err) {
-          if (err) {
-            repl.cancel();
-          }
-        });
-        repl.on('complete', function () {
-          remote._ajax = ajax;
-          done();
-        });
-      });
-    });
-
     it('Heartbeat gets passed', function (done) {
 
       if (!(/http/.test(dbs.remote) && !/http/.test(dbs.name))) {
@@ -4415,6 +4420,24 @@ adapters.forEach(function (adapters) {
         seenTimeout.should.equal(true);
         remote._ajax = ajax;
         done();
+      });
+    });
+
+    it('#5452 Cleanly fail with no unhandled promises on a bad connection', function (done) {
+
+      if (!/http/.test(dbs.remote)) {
+        return done();
+      }
+
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB('http://localhost:9382/does_not_exist', {skip_setup: true});
+
+      return remote.replicate.to(db, {
+          live: true,
+          since: 0,
+          timeout: 20000
+      }).catch(function () {
+          done();
       });
     });
 
