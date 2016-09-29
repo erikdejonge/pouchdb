@@ -149,16 +149,6 @@ describe('test.http.js', function () {
     return db.info();
   });
 
-  it('getUrl() works (used by plugins)', function () {
-    var db = new PouchDB(dbs.name);
-    db.getUrl().should.match(/^http/);
-  });
-
-  it('getHeaders() works (used by plugins)', function () {
-    var db = new PouchDB(dbs.name);
-    db.getHeaders().should.deep.equal({});
-  });
-
   it('test url too long error for allDocs()', function () {
     var docs = [];
     var numDocs = 75;
@@ -192,6 +182,16 @@ describe('test.http.js', function () {
       throw new Error('expected an error');
     }).catch(function (err) {
       should.exist(err);
+    });
+  });
+
+
+  it('5574 Create a pouch with / in name and prefix url', function () {
+    var db = new PouchDB('test/suffix', {
+      prefix: testUtils.adapterUrl('http', '')
+    });
+    return db.info().then(function () {
+      return db.destroy();
     });
   });
 

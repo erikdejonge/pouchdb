@@ -4,8 +4,7 @@
 # We might have to change this later.
 MAX=50000
 
-npm run build
-SIZE=`gzip -c packages/pouchdb/dist/pouchdb.min.js | wc -c`
+SIZE=`gzip -c packages/node_modules/pouchdb/dist/pouchdb.min.js | wc -c`
 
 echo "Checking that pouchdb.min.js size $SIZE is less than $MAX"
 

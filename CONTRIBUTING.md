@@ -166,3 +166,11 @@ Release Procedure
  * Update docs/_config.yml to the current version
  * Push updated versions to master
  * `npm run publish-site`
+
+To do a dry run release, you can run:
+
+    DRY_RUN=1 npm run release
+
+To do a beta release to npm (using the dist-tag `beta`), do:
+
+    BETA=1 npm run release

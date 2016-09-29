@@ -24,6 +24,11 @@ adapters.forEach(function (adapter) {
       db.should.be.an.instanceof(PouchDB);
     });
 
+    it('Name is accessible via instance', function () {
+      var db = new PouchDB(dbs.name);
+      db.name.should.equal(dbs.name);
+    });
+
     it('4314 Create a pouch with + in name', function () {
       var db = new PouchDB(dbs.name + '+suffix');
       return db.info().then(function () {
@@ -1099,6 +1104,14 @@ adapters.forEach(function (adapter) {
             }
           });
         });
+      });
+    }
+
+    if (typeof process !== 'undefined' && !process.browser) {
+      it('#5471 PouchDB.plugin() should throw error if passed wrong type or empty object', function () {
+        (function () {
+          PouchDB.plugin('pouchdb-adapter-memory');
+        }).should.throw(Error, 'Invalid plugin: object passed in is empty or not an object');
       });
     }
   });

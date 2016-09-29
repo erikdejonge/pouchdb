@@ -17,6 +17,7 @@ var browserify = require('browserify');
 var browserifyIncremental = require('browserify-incremental');
 var rollup = require('rollup');
 var nodeResolve = require('rollup-plugin-node-resolve');
+var replace = require('rollup-plugin-replace');
 var derequire = require('derequire');
 var fs = require('fs');
 var writeFileAsync = denodeify(fs.writeFile);
@@ -28,25 +29,14 @@ var spawn = require('child_process').spawn;
 var all = Promise.all.bind(Promise);
 var argsarray = require('argsarray');
 
-var pkg = require('../packages/pouchdb/package.json');
+var pkg = require('../packages/node_modules/pouchdb/package.json');
 var version = pkg.version;
 
-// these modules should be treated as external by Rollup
-var external = require('./external-deps');
+var builtInModules = require('builtin-modules');
+var external = Object.keys(require('../package.json').dependencies)
+  .concat(builtInModules);
 
 var plugins = ['fruitdown', 'localstorage', 'memory'];
-var browserExtras = {
-  'src/extras/ajax.js': 'ajax-browser.js',
-  'src/extras/checkpointer.js': 'checkpointer-browser.js',
-  'src/extras/generateReplicationId.js': 'generateReplicationId-browser.js'
-};
-var nodeExtras = {
-  'src/extras/promise.js': 'promise.js',
-  'src/extras/checkpointer.js': 'checkpointer.js',
-  'src/extras/generateReplicationId.js': 'generateReplicationId.js',
-  'src/extras/ajax.js': 'ajax.js',
-  'src/extras/websql.js': 'websql.js'
-};
 
 var currentYear = new Date().getFullYear();
 
@@ -88,7 +78,7 @@ var comments = {
 };
 
 function addPath(otherPath) {
-  return path.resolve('packages/pouchdb', otherPath);
+  return path.resolve('packages/node_modules/pouchdb', otherPath);
 }
 
 function writeFile(filename, contents) {
@@ -97,7 +87,7 @@ function writeFile(filename, contents) {
     return renameAsync(tmp, filename);
   }).then(function () {
     console.log('  \u2713' + ' wrote ' +
-      filename.match(/packages[\/\\]pouchdb[\/\\].*/)[0]);
+      filename.match(/packages[\/\\]node_modules[\/\\]pouchdb[\/\\].*/)[0]);
   });
 }
 
@@ -157,7 +147,7 @@ function doBrowserify(filepath, opts, exclude) {
   });
 }
 
-function doRollup(entry, fileOut, browser) {
+function doRollup(entry, browser, formatsToFiles) {
   var start = process.hrtime();
   return rollup.rollup({
     entry: addPath(entry),
@@ -168,28 +158,40 @@ function doRollup(entry, fileOut, browser) {
         jsnext: true,
         browser: browser,
         main: false  // don't use "main"s that are CJS
+      }),
+      replace({
+        // we have switches for coverage; don't ship this to consumers
+        'process.env.COVERAGE': JSON.stringify(!!process.env.COVERAGE)
       })
     ]
   }).then(function (bundle) {
-    var code = bundle.generate({format: 'cjs'}).code;
-    if (DEV_MODE) {
-      var ms = Math.round(process.hrtime(start)[1] / 1000000);
-      console.log('    took ' + ms + ' ms to rollup ' +
-        path.dirname(entry) + '/' + path.basename(entry));
-    }
-    return writeFile(addPath(fileOut),
-      addVersion(code));
+    return Promise.all(Object.keys(formatsToFiles).map(function (format) {
+      var fileOut = formatsToFiles[format];
+      var code = bundle.generate({format: format}).code;
+      if (DEV_MODE) {
+        var ms = Math.round(process.hrtime(start)[1] / 1000000);
+        console.log('    took ' + ms + ' ms to rollup ' +
+          path.dirname(entry) + '/' + path.basename(entry));
+      }
+      return writeFile(addPath(fileOut), addVersion(code));
+    }));
   });
 }
 
 // build for Node (index.js)
 function buildForNode() {
-  return doRollup('src/index.js', 'lib/index.js');
+  return doRollup('src/index.js', false, {
+    cjs: 'lib/index.js',
+    es: 'lib/index.es.js'
+  });
 }
 
 // build for Browserify/Webpack (index-browser.js)
 function buildForBrowserify() {
-  return doRollup('src/index.js', 'lib/index-browser.js', true);
+  return doRollup('src/index.js', true, {
+    cjs: 'lib/index-browser.js',
+    es: 'lib/index-browser.es.js'
+  });
 }
 
 // build for the browser (dist)
@@ -207,41 +209,30 @@ function buildForBrowser() {
 
 function buildPluginsForBrowserify() {
   return all(plugins.map(function (plugin) {
-    return doRollup('src/extras/' + plugin + '.js',
-                    'lib/extras/' + plugin + '.js', true);
-  }));
-}
-
-function buildNodeExtras() {
-  return all(Object.keys(nodeExtras).map(function (entry) {
-    var target = nodeExtras[entry];
-    return doRollup(entry, 'lib/extras/' + target);
-  }));
-}
-
-function buildBrowserExtras() {
-  return all(Object.keys(browserExtras).map(function (entry) {
-    var target = browserExtras[entry];
-    return doRollup(entry, 'lib/extras/' + target, true);
+    return doRollup('src/plugins/' + plugin + '.js', true, {
+      cjs: 'lib/plugins/' + plugin + '.js'
+    });
   }));
 }
 
 function buildPluginsForBrowser() {
   return all(plugins.map(function (plugin) {
-    var source = 'lib/extras/' + plugin + '.js';
+    var source = 'lib/plugins/' + plugin + '.js';
     return doBrowserify(source, {}, 'pouchdb').then(function (code) {
       code = comments[plugin] + code;
       return all([
-        writeFile('packages/pouchdb/dist/pouchdb.' + plugin + '.js', code),
+        writeFile('packages/node_modules/pouchdb/dist/pouchdb.' + plugin + '.js', code),
         doUglify(code, comments[plugin], 'dist/pouchdb.' + plugin + '.min.js')
       ]);
     });
-  }));
+  })).then(function () {
+    return rimraf(addPath('lib/plugins')); // no need for this after building dist/
+  });
 }
 
 function buildPouchDBNext() {
   return doBrowserify('src/next.js', {standalone: 'PouchDB'}).then(function (code) {
-    return writeFile('packages/pouchdb/dist/pouchdb-next.js', code);
+    return writeFile('packages/node_modules/pouchdb/dist/pouchdb-next.js', code);
   });
 }
 
@@ -264,9 +255,8 @@ var doAll = argsarray(function (args) {
 });
 
 function doBuildNode() {
-  return mkdirp('lib/extras')
-    .then(buildForNode)
-    .then(buildNodeExtras);
+  return mkdirp(addPath('lib/plugins'))
+    .then(buildForNode);
 }
 
 function doBuildDev() {
@@ -276,10 +266,10 @@ function doBuildDev() {
 }
 
 function doBuildAll() {
-  return rimrafMkdirp('lib', 'dist', 'lib/extras')
+  return rimrafMkdirp('lib', 'dist', 'lib/plugins')
     .then(doAll(buildForNode, buildForBrowserify))
     .then(doAll(buildForBrowser, buildPluginsForBrowserify, buildPouchDBNext))
-    .then(doAll(buildPluginsForBrowser, buildNodeExtras, buildBrowserExtras));
+    .then(doAll(buildPluginsForBrowser));
 }
 
 function doBuild() {

@@ -4,7 +4,11 @@ title: Adapters
 sidebar: nav.html
 ---
 
-PouchDB is not a self-contained database; it is a CouchDB-style abstraction layer over other databases. By default, PouchDB ships with [IndexedDB][] and [WebSQL][] adapters in the browser, and a [LevelDB][] adapter in Node.js.
+PouchDB is not a self-contained database; it is a CouchDB-style abstraction layer over other databases. By default, PouchDB ships with [IndexedDB][] and [WebSQL][] adapters in the browser, and a [LevelDB][] adapter in Node.js. This can be visualized as so:
+
+<object data="static/svg/pouchdb_adapters.svg" type="image/svg+xml">
+    <img src="static/img/pouchdb_adapters.png" alt="adapters">
+</object>
 
 PouchDB attempts to provide a consistent API that "just works" across every browser and JavaScript environment, and in most cases, you can just use the defaults. However, if you're trying to reach the widest possible audience, or if you want the best performance, then you will sometimes want to tinker with the adapter settings.
 
@@ -146,7 +150,6 @@ We recommend avoiding Cordova SQLite unless you are hitting the 50MB storage lim
 require native or preloaded access to the database files, or there's some other reason to go native.
 The built-in IndexedDB and WebSQL adapters are nearly always more performant and stable.
 
-{% endmarkdown %}
 {% include alert/end.html%}
 
 ### Browser adapter plugins
@@ -161,7 +164,7 @@ PouchDB also offers separate browser plugins that use backends other than Indexe
 
 {% include alert/start.html variant="warning"%}
 {% markdown %}
-These plugins add a hefty footprint due to external dependencies, so take them with a grain of salt. You may want to [use the Browserify/Webpack versions](/api.html#extras) to deduplicate code and create a smaller bundle.
+These plugins add a hefty footprint due to external dependencies, so take them with a grain of salt.
 {% endmarkdown %}
 {% include alert/end.html%}
 
@@ -273,7 +276,7 @@ In addition to the LevelDOWN-based adapters, you can also use PouchDB over
 
 ```js
 var PouchDB = require('pouchdb');
-require('pouchdb/extras/websql');
+PouchDB.plugin(require('pouchdb-adapter-node-websql'));
 
 var db = new PouchDB('mydatabase.db', {adapter: 'websql'});
 ```
