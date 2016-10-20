@@ -104,6 +104,13 @@ testUtils.base64Blob = function (blob, callback) {
 // Prefix http adapter database names with their host and
 // node adapter ones with a db location
 testUtils.adapterUrl = function (adapter, name) {
+
+  // CouchDB master has problems with cycling databases rapidly
+  // so give tests seperate names
+  if (testUtils.isCouchMaster()) {
+    name += '_' + Date.now();
+  }
+
   if (adapter === 'http') {
     return testUtils.couchHost() + '/' + name;
   }
@@ -270,7 +277,7 @@ testUtils.ajax = PouchForCoverage.ajax;
 testUtils.uuid = pouchUtils.uuid;
 testUtils.parseUri = pouchUtils.parseUri;
 testUtils.errors = PouchForCoverage.Errors;
-testUtils.extend = require('js-extend').extend;
+testUtils.extend = pouchUtils.jsExtend;
 
 testUtils.makeBlob = function (data, type) {
   if (typeof process !== 'undefined' && !process.browser) {
