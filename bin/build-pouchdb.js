@@ -6,6 +6,7 @@
 // from the others due to legacy support (dist/, extras/, etc.).
 
 var DEV_MODE = process.env.CLIENT === 'dev';
+var TRAVIS = process.env.TRAVIS;
 
 var lie = require('lie');
 if (typeof Promise === 'undefined') {
@@ -91,13 +92,9 @@ function writeFile(filename, contents) {
   });
 }
 
-function addVersion(code) {
-  return code.replace('__VERSION__', version);
-}
-
 // do uglify in a separate process for better perf
 function doUglify(code, prepend, fileOut) {
-  if (DEV_MODE) { // skip uglify in "npm run dev" mode
+  if (DEV_MODE || TRAVIS) { // skip uglify in "npm run dev" mode and on Travis
     return Promise.resolve();
   }
   var binPath = require.resolve('uglify-js/bin/uglifyjs');
@@ -161,7 +158,9 @@ function doRollup(entry, browser, formatsToFiles) {
       }),
       replace({
         // we have switches for coverage; don't ship this to consumers
-        'process.env.COVERAGE': JSON.stringify(!!process.env.COVERAGE)
+        'process.env.COVERAGE': JSON.stringify(!!process.env.COVERAGE),
+        // test for fetch vs xhr
+        'process.env.FETCH': JSON.stringify(!!process.env.FETCH)
       })
     ]
   }).then(function (bundle) {
@@ -173,7 +172,7 @@ function doRollup(entry, browser, formatsToFiles) {
         console.log('    took ' + ms + ' ms to rollup ' +
           path.dirname(entry) + '/' + path.basename(entry));
       }
-      return writeFile(addPath(fileOut), addVersion(code));
+      return writeFile(addPath(fileOut), code);
     }));
   });
 }

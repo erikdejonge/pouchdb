@@ -1630,7 +1630,7 @@ adapters.forEach(function (adapters) {
       });
     });
 
-    it('Replication with deleted doc', function (done) {
+    it('Replication with deleted doc', function () {
       var db = new PouchDB(dbs.name);
       var remote = new PouchDB(dbs.remote);
       var docs1 = [
@@ -1640,20 +1640,39 @@ adapters.forEach(function (adapters) {
         {_id: '3', integer: 3},
         {_id: '4', integer: 4, _deleted: true}
       ];
-      remote.bulkDocs({ docs: docs1 }, function () {
-        db.replicate.from(remote, function () {
-          db.allDocs(function (err, res) {
-            res.total_rows.should.equal(4);
-            db.info(function (err, info) {
-              verifyInfo(info, {
-                update_seq: 5,
-                doc_count: 4
-              });
-              done();
-            });
+      return remote.bulkDocs({ docs: docs1 })
+        .then(function () {
+          return db.replicate.from(remote);
+        }).then(function () {
+          return db.allDocs();
+        }).then(function (res) {
+          res.total_rows.should.equal(4);
+          return db.info();
+        }).then(function (info) {
+          verifyInfo(info, {
+            update_seq: 5,
+            doc_count: 4
           });
         });
-      });
+    });
+
+    it('5904 - replication with deleted doc and value', function () {
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+      var doc = {_id: 'foo', integer: 4, _deleted: true};
+      var rev;
+      return db.put(doc)
+        .then(function (res) {
+          rev = res.rev;
+          return db.get(doc._id, { rev: rev });
+        }).then(function (local_doc) {
+          local_doc.integer.should.equal(4);
+          return db.replicate.to(remote);
+        }).then(function () {
+          return remote.get(doc._id, { rev: rev });
+        }).then(function (remote_doc) {
+          remote_doc.integer.should.equal(4);
+        });
     });
 
     it('Replication with doc deleted twice', function (done) {
@@ -2130,353 +2149,6 @@ adapters.forEach(function (adapters) {
       });
     });
 
-    it.skip('(#1240) - get error', function (done) {
-      var db = new PouchDB(dbs.name);
-      var remote = new PouchDB(dbs.remote);
-      // 10 test documents
-      var num = 10;
-      var docs = [];
-      for (var i = 0; i < num; i++) {
-        docs.push({
-          _id: 'doc_' + i,
-          foo: 'bar_' + i
-        });
-      }
-      // Initialize remote with test documents
-      remote.bulkDocs({ docs: docs }, {}, function () {
-        var get = remote.get;
-        function first_replicate() {
-          // Mock remote.get to fail writing doc_3 (fourth doc)
-          remote.get = function () {
-            // Simulate failure to get the document with id 'doc_4'
-            // This should block the replication at seq 4
-            if (arguments[0] === 'doc_4') {
-              arguments[2].apply(null, [{}]);
-            } else {
-              get.apply(this, arguments);
-            }
-          };
-          // Replicate and confirm failure, docs_written and target docs
-          db.replicate.from(remote, function (err, result) {
-            should.exist(err);
-            should.exist(result);
-            result.docs_written.should.equal(4);
-            function check_docs(id) {
-              if (!id) {
-                second_replicate();
-                return;
-              }
-              db.get(id, function (err, exists) {
-                if (exists) {
-                  should.not.exist(err);
-                } else {
-                  should.exist(err);
-                }
-                check_docs(docs.shift());
-              });
-            }
-            var docs = [
-              [
-                'doc_0',
-                true
-              ],
-              [
-                'doc_1',
-                true
-              ],
-              [
-                'doc_2',
-                true
-              ],
-              [
-                'doc_3',
-                false
-              ],
-              [
-                'doc_4',
-                false
-              ],
-              [
-                'doc_5',
-                false
-              ],
-              [
-                'doc_6',
-                false
-              ],
-              [
-                'doc_7',
-                false
-              ],
-              [
-                'doc_8',
-                false
-              ],
-              [
-                'doc_9',
-                false
-              ]
-            ];
-            check_docs(docs.shift());
-          });
-        }
-        function second_replicate() {
-          // Restore remote.get to original
-          remote.get = get;
-          // Replicate and confirm success, docs_written and target docs
-          db.replicate.from(remote, function (err, result) {
-            should.not.exist(err);
-            should.exist(result);
-            result.docs_written.should.equal(6);
-            function check_docs(id, exists) {
-              if (!id) {
-                db.info(function (err, info) {
-                  verifyInfo(info, {
-                    update_seq: 6,
-                    doc_count: 6
-                  });
-                  done();
-                });
-                return;
-              }
-              db.get(id, function (err) {
-                if (exists) {
-                  should.not.exist(err);
-                } else {
-                  should.exist(err);
-                }
-                check_docs(docs.shift());
-              });
-            }
-            var docs = [
-              [
-                'doc_0',
-                true
-              ],
-              [
-                'doc_1',
-                true
-              ],
-              [
-                'doc_2',
-                true
-              ],
-              [
-                'doc_3',
-                true
-              ],
-              [
-                'doc_4',
-                true
-              ],
-              [
-                'doc_5',
-                true
-              ],
-              [
-                'doc_6',
-                true
-              ],
-              [
-                'doc_7',
-                true
-              ],
-              [
-                'doc_8',
-                true
-              ],
-              [
-                'doc_9',
-                true
-              ]
-            ];
-            check_docs(docs.shift());
-          });
-        }
-        // Done the test
-        first_replicate();
-      });
-    });
-
-    it.skip('Get error 2', function (done) {
-      var db = new PouchDB(dbs.name);
-      var remote = new PouchDB(dbs.remote);
-      // 10 test documents
-      var num = 10;
-      var docs = [];
-      for (var i = 0; i < num; i++) {
-        docs.push({
-          _id: 'doc_' + i,
-          foo: 'bar_' + i
-        });
-      }
-      // Initialize remote with test documents
-      remote.bulkDocs({ docs: docs }, {}, function () {
-        var get = remote.get;
-        function first_replicate() {
-          // Mock remote.get to fail writing doc_3 (fourth doc)
-          remote.get = function () {
-            // Simulate failure to get the document with id 'doc_4'
-            // This should block the replication at seq 4
-            if (arguments[0] === 'doc_4') {
-              arguments[2].apply(null, [{
-                status: 500,
-                error: 'mock error',
-                reason: 'mock get failure'
-              }]);
-            } else {
-              get.apply(this, arguments);
-            }
-          };
-          // Replicate and confirm failure, docs_written and target docs
-          db.replicate.from(remote, function (err, result) {
-            err.status.should.equal(500);
-            err.error.should.equal('Replication aborted');
-            err.reason.should.equal('src.get completed with error');
-            err.details.status.should.equal(500);
-            err.details.error.should.equal('mock error');
-            err.details.reason.should.equal('mock get failure');
-            result.errors[0].status.should.equal(500);
-            result.errors[0].error.should.equal('mock error');
-            result.errors[0].reason.should.equal('mock get failure');
-            result.docs_written.should.equal(4);
-            function check_docs(id) {
-              if (!id) {
-                second_replicate();
-                return;
-              }
-              db.get(id, function (err, exists) {
-                if (exists) {
-                  should.not.exist(err);
-                } else {
-                  should.exist(err);
-                }
-                check_docs(docs.shift());
-              });
-            }
-            var docs = [
-              [
-                'doc_0',
-                true
-              ],
-              [
-                'doc_1',
-                true
-              ],
-              [
-                'doc_2',
-                true
-              ],
-              [
-                'doc_3',
-                false
-              ],
-              [
-                'doc_4',
-                false
-              ],
-              [
-                'doc_5',
-                false
-              ],
-              [
-                'doc_6',
-                false
-              ],
-              [
-                'doc_7',
-                false
-              ],
-              [
-                'doc_8',
-                false
-              ],
-              [
-                'doc_9',
-                false
-              ]
-            ];
-            check_docs(docs.shift());
-          });
-        }
-        function second_replicate() {
-          // Restore remote.get to original
-          remote.get = get;
-          // Replicate and confirm success, docs_written and target docs
-          db.replicate.from(remote, function (err, result) {
-            should.not.exist(err);
-            should.exist(result);
-            result.docs_written.should.equal(6);
-            function check_docs(id, exists) {
-              if (!id) {
-                db.info(function (err, info) {
-                  verifyInfo(info, {
-                    update_seq: 6,
-                    doc_count: 6
-                  });
-                  done();
-                });
-                return;
-              }
-              db.get(id, function (err) {
-                if (exists) {
-                  should.not.exist(err);
-                } else {
-                  should.exist(err);
-                }
-                check_docs(docs.shift());
-              });
-            }
-            var docs = [
-              [
-                'doc_0',
-                true
-              ],
-              [
-                'doc_1',
-                true
-              ],
-              [
-                'doc_2',
-                true
-              ],
-              [
-                'doc_3',
-                true
-              ],
-              [
-                'doc_4',
-                true
-              ],
-              [
-                'doc_5',
-                true
-              ],
-              [
-                'doc_6',
-                true
-              ],
-              [
-                'doc_7',
-                true
-              ],
-              [
-                'doc_8',
-                true
-              ],
-              [
-                'doc_9',
-                true
-              ]
-            ];
-            check_docs(docs.shift());
-          });
-        }
-        // Done the test
-        first_replicate();
-      });
-    });
-
     it('(#4963) Ensure successful docs are saved but seq not updated if single doc fails to replicate', function (done) {
       var db = new PouchDB(dbs.name);
       var remote = new PouchDB(dbs.remote);
@@ -2608,44 +2280,6 @@ adapters.forEach(function (adapters) {
         }
         // Done the test
         first_replicate();
-      });
-    });
-
-    it.skip("error updating checkpoint", function (done) {
-      var db = new PouchDB(dbs.name);
-      var remote = new PouchDB(dbs.remote);
-      remote.bulkDocs({docs: docs}, {}, function () {
-        var get = remote.get;
-        var local_count = 0;
-        // Mock remote.get to fail writing doc_3 (fourth doc)
-        remote.get = function () {
-          // Simulate failure to get the checkpoint
-          if (arguments[0].slice(0, 6) === '_local') {
-            local_count++;
-            if (local_count === 2) {
-              arguments[1].apply(null, [{
-                status: 500,
-                error: 'mock get error',
-                reason: 'simulate an error updating the checkpoint'
-              }]);
-            } else {
-              get.apply(this, arguments);
-            }
-          } else {
-            get.apply(this, arguments);
-          }
-        };
-
-        db.replicate.from(remote).on('error', function (err) {
-          should.exist(err);
-          db.info(function (err, info) {
-            verifyInfo(info, {
-              update_seq: 2,
-              doc_count: 2
-            });
-            done();
-          });
-        });
       });
     });
 

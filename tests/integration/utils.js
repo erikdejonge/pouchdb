@@ -136,7 +136,7 @@ testUtils.cleanup = function (dbs, done) {
 // in rev_tree). Doc must have _rev. If prevRev is not specified
 // just insert doc with correct _rev (new_edits=false!)
 testUtils.putAfter = function (db, doc, prevRev, callback) {
-  var newDoc = testUtils.extend({}, doc);
+  var newDoc = testUtils.assign({}, doc);
   if (!prevRev) {
     db.put(newDoc, { new_edits: false }, callback);
     return;
@@ -277,11 +277,12 @@ testUtils.ajax = PouchForCoverage.ajax;
 testUtils.uuid = pouchUtils.uuid;
 testUtils.parseUri = pouchUtils.parseUri;
 testUtils.errors = PouchForCoverage.Errors;
-testUtils.extend = pouchUtils.jsExtend;
+testUtils.assign = pouchUtils.assign;
 
 testUtils.makeBlob = function (data, type) {
   if (typeof process !== 'undefined' && !process.browser) {
-    return new Buffer(data, 'binary');
+    // "global.Buffer" is to avoid Browserify pulling this in
+    return new global.Buffer(data, 'binary');
   } else {
     return pouchUtils.blob([data], {
       type: (type || 'text/plain')
@@ -334,24 +335,11 @@ if (typeof process !== 'undefined' && !process.browser) {
   if (process.env.COVERAGE) {
     global.PouchDB = require('../../packages/node_modules/pouchdb-for-coverage');
   } else { // no need to check for coverage
-    global.PouchDB = require('../../packages/node_modules/pouchdb');
+    // string addition is to avoid browserify pulling in whole thing
+    global.PouchDB = require('../../packages/' + 'node_modules/pouchdb');
   }
 
-  if (process.env.LEVEL_ADAPTER || process.env.LEVEL_PREFIX) {
-    // test a special *down adapter and/or prefix
-    var defaults = {};
-
-    if (process.env.LEVEL_ADAPTER) {
-      defaults.db = require(process.env.LEVEL_ADAPTER);
-      console.log('Using client-side leveldown adapter: ' +
-        process.env.LEVEL_ADAPTER);
-    }
-    if (process.env.LEVEL_PREFIX) {
-      defaults.prefix = process.env.LEVEL_PREFIX;
-      console.log('Using client-side leveldown prefix: ' + defaults.prefix);
-    }
-    global.PouchDB = global.PouchDB.defaults(defaults);
-  } else if (process.env.AUTO_COMPACTION) {
+  if (process.env.AUTO_COMPACTION) {
     // test autocompaction
     global.PouchDB = global.PouchDB.defaults({
       auto_compaction: true,
@@ -361,12 +349,16 @@ if (typeof process !== 'undefined' && !process.browser) {
     // test WebSQL in Node
     // (the two strings are just to fool Browserify because sqlite3 fails
     // in Node 0.11-0.12)
-    global.PouchDB.plugin(require('../../packages/node_modules/' +
+   global.PouchDB.plugin(require('../../packages/node_modules/' +
       'pouchdb-adapter-node-websql'));
     global.PouchDB.preferredAdapters = ['websql', 'leveldb'];
     global.PouchDB = global.PouchDB.defaults({
       prefix: path.resolve('./tmp/_pouch_')
     });
+  } else if (process.env.ADAPTER === 'memory') {
+    global.PouchDB.plugin(require('../../packages/node_modules/' +
+      'pouchdb-adapter-memory'));
+    global.PouchDB.preferredAdapters = ['memory', 'leveldb'];
   } else {
     // test regular leveldown in node
     global.PouchDB = global.PouchDB.defaults({
