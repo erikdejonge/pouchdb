@@ -228,7 +228,7 @@ function tests(suiteName, dbName, dbType) {
       });
     });
 
-    it("Query non existing view returns error", function () {
+    it("Query non existing view throws error", function () {
       var db = new PouchDB(dbName);
       var doc = {
         _id: '_design/barbar',
@@ -239,8 +239,23 @@ function tests(suiteName, dbName, dbType) {
         }
       };
       return db.post(doc).then(function () {
-        return db.query('barbar/dontExist', {key: 'bar'});
-      }).should.be.rejected;
+        return db.query('barbar/dontExist', {key: 'bar'}).should.be.rejected;
+      });
+    });
+
+    it("Query non-string view throws error", function () {
+      var db = new PouchDB(dbName);
+      var doc = {
+        _id: '_design/barbar',
+        views: {
+          scores: {
+            map: 1
+          }
+        }
+      };
+      return db.post(doc).then(function () {
+        return db.query('barbar/scores', {key: 'bar'}).should.be.rejected;
+      });
     });
 
     it('many simultaneous persisted views', function () {
@@ -459,6 +474,58 @@ function tests(suiteName, dbName, dbType) {
         });
       });
     }
+
+    it('test docs with reserved IDs', function () {
+      var db = new PouchDB(dbName);
+
+      var docs = [
+        {_id: 'constructor'},
+        {_id: 'isPrototypeOf'},
+        {_id: 'hasOwnProperty'},
+        {
+          _id : '_design/view',
+          views : {
+            view : {
+              map : "function(doc){emit(doc._id);}"
+            }
+          }
+        }
+      ];
+      return db.bulkDocs(docs).then(function () {
+        return db.query('view/view', {include_docs: true});
+      }).then(function (res) {
+        var rows = res.rows.map(function (row) {
+          return {
+            id: row.id,
+            key: row.key,
+            docId: row.doc._id
+          };
+        });
+        assert.deepEqual(rows, [
+          { "id": "constructor",
+            "key": "constructor",
+            "docId": "constructor"
+          },
+          {
+            "id": "hasOwnProperty",
+            "key": "hasOwnProperty",
+            "docId": "hasOwnProperty"
+          },
+          {
+            "id": "isPrototypeOf",
+            "key": "isPrototypeOf",
+            "docId": "isPrototypeOf"
+          }
+        ]);
+        return db.viewCleanup();
+      }).then(function () {
+        return db.get('_design/view');
+      }).then(function (doc) {
+        return db.remove(doc);
+      }).then(function () {
+        return db.viewCleanup();
+      });
+    });
 
     it('should handle user errors in design doc names', function () {
       var db = new PouchDB(dbName);

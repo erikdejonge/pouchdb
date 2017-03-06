@@ -40,6 +40,8 @@ if (process.env.PERF) {
   testUrl = testRoot + 'fuzzy/index.html';
 } else if (process.env.TYPE === 'mapreduce') {
   testUrl = testRoot + 'mapreduce/index.html';
+} else if (process.env.TYPE === 'find') {
+  testUrl = testRoot + 'find/index.html';
 } else {
   testUrl = testRoot + 'integration/index.html';
 }
@@ -74,8 +76,17 @@ if (process.env.SKIP_MIGRATION) {
 if (process.env.POUCHDB_SRC) {
   qs.src = process.env.POUCHDB_SRC;
 }
+if (process.env.PLUGINS) {
+  qs.plugins = process.env.PLUGINS;
+}
 if (process.env.COUCH_HOST) {
   qs.couchHost = process.env.COUCH_HOST;
+}
+if (process.env.ADAPTER) {
+  qs.adapter = process.env.ADAPTER;
+}
+if (process.env.ITERATIONS) {
+  qs.iterations = process.env.ITERATIONS;
 }
 if (process.env.NEXT) {
   qs.NEXT = '1';
@@ -125,7 +136,7 @@ function postResult(result) {
 }
 
 function testComplete(result) {
-  console.log(result);
+  console.log('=>', JSON.stringify(result, null, '  '), '<=');
 
   sauceClient.quit().then(function () {
     if (sauceConnectProcess) {
@@ -204,7 +215,7 @@ function startTest() {
           clearInterval(interval);
           testComplete(results);
         } else {
-          console.log('=> ', results);
+          console.log(results);
         }
       });
     }, 10 * 1000);

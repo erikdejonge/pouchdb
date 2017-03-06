@@ -39,7 +39,10 @@ before_script:
   # is a lint failure
   - npm run eslint
 
-script: npm run $COMMAND
+# travis_retry will try up to 3 times to run the script. our tests
+# are flaky enough (Selenium, SauceLabs, network, etc.) that this
+# mitigates a lot of false negatives
+script: travis_retry npm run $COMMAND
 
 env:
   global:
@@ -72,6 +75,10 @@ env:
   - TYPE=mapreduce CLIENT=node COMMAND=test
   - TYPE=mapreduce CLIENT=selenium:firefox:47.0.2 COMMAND=test
   - TYPE=mapreduce CLIENT=selenium:phantomjs COMMAND=test
+
+  # Test pouchdb-find
+  - COUCH_HOST=http://127.0.0.1:3001 TYPE=find PLUGINS=pouchdb-find CLIENT=node SERVER=couchdb-master COMMAND=test
+  - TYPE=find PLUGINS=pouchdb-find CLIENT=selenium:firefox:47.0.2 SERVER=pouchdb-server COMMAND=test
 
   # Testing in saucelabs
   - CLIENT=saucelabs:chrome COMMAND=test
@@ -107,7 +114,7 @@ env:
   - COMMAND=test-fuzzy
   # need extra env variable COVERAGE here because of some subtlety in Travis containers not
   # passing the process.env.COVERAGE to the node process
-  - COMMAND=report-coverage COVERAGE=1
+  - COMMAND=report-coverage COVERAGE=1 SERVER=pouchdb-server POUCHDB_SERVER_FLAGS=--in-memory PLUGINS=pouchdb-find
   - COMMAND=verify-build
 
 matrix:
@@ -122,11 +129,6 @@ matrix:
   allow_failures:
   - env: COUCH_HOST=http://127.0.0.1:3001 CLIENT=node SERVER=couchdb-master COMMAND=test
   - env: COUCH_HOST=http://127.0.0.1:3001 SKIP_MIGRATION=true CLIENT=selenium:firefox:47.0.2 SERVER=couchdb-master COMMAND=test
-  - env: CLIENT=selenium:firefox:47.0.2 PERF=1 COMMAND=test
-  - env: CLIENT=selenium:firefox:47.0.2 NEXT=1 COMMAND=test
-  - node_js: "7"
-    services: docker
-    env: CLIENT=node COMMAND=test
 
 branches:
   only:

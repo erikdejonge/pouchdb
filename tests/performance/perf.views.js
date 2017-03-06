@@ -1,6 +1,6 @@
 'use strict';
 
-module.exports = function (PouchDB, opts) {
+module.exports = function (PouchDB, opts, callback) {
 
   var Promise = require('lie');
   var utils = require('./utils');
@@ -51,6 +51,36 @@ module.exports = function (PouchDB, opts) {
             emit(doc.key);
           }, task);
         })).then(function () {
+          done();
+        }, done);
+      }
+    },
+    {
+      name: 'build-secondary-index',
+      assertions: 1,
+      iterations: 1,
+      setup: function (db, callback) {
+        var docs = [];
+        for (var i = 0; i < 1000; i++) {
+          docs.push({});
+        }
+        db.bulkDocs(docs).then(function () {
+          return db.put({
+            _id : '_design/myview',
+            views : {
+              myview : {
+                map : function (doc) {
+                  emit(doc._id);
+                }.toString()
+              }
+            }
+          });
+        }).then(function () {
+          callback();
+        }, callback);
+      },
+      test: function (db, itr, doc, done) {
+        db.query('myview/myview', {limit: 0}).then(function () {
           done();
         }, done);
       }
@@ -143,6 +173,6 @@ module.exports = function (PouchDB, opts) {
     }
   ];
 
-  utils.runTests(PouchDB, 'views', testCases, opts);
+  utils.runTests(PouchDB, 'views', testCases, opts, callback);
 
 };

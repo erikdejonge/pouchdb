@@ -16,11 +16,12 @@ npm install
 VERSION=$(node --eval "console.log(require('./packages/node_modules/pouchdb/package.json').version);")
 
 # Create a temporary build directory
+SOURCE_DIR=$(git name-rev --name-only HEAD)
 BUILD_DIR=build_"${RANDOM}"
 git checkout -b $BUILD_DIR
 
 # Update dependency versions inside each package.json (replace the "*")
-node bin/update-dependencies.js
+node bin/update-package-json-for-publish.js
 
 # Publish all modules with Lerna
 for pkg in $(ls packages/node_modules); do
@@ -57,7 +58,7 @@ if [ -z $DRY_RUN ]; then
     git push --tags git@github.com:pouchdb/pouchdb.git $VERSION
 
     # Cleanup
-    git checkout master
+    git checkout $SOURCE_DIR
     git branch -D $BUILD_DIR
   fi
 fi

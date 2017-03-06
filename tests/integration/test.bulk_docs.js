@@ -42,10 +42,10 @@ adapters.forEach(function (adapter) {
       {name: 'Randall Leeds', commits: 9}
     ];
 
-    it('Testing bulk docs', function (done) {
+    it('Testing bulk docs', function () {
       var db = new PouchDB(dbs.name);
       var docs = makeDocs(5);
-      db.bulkDocs({ docs: docs }, function (err, results) {
+      return db.bulkDocs({ docs: docs }).then(function (results) {
         results.should.have.length(5, 'results length matches');
         for (var i = 0; i < 5; i++) {
           results[i].id.should.equal(docs[i]._id, 'id matches');
@@ -54,27 +54,73 @@ adapters.forEach(function (adapter) {
           docs[i]._rev = results[i].rev;
           docs[i].string = docs[i].string + '.00';
         }
-        db.bulkDocs({ docs: docs }, function (err, results) {
-          results.should.have.length(5, 'results length matches');
-          for (i = 0; i < 5; i++) {
-            results[i].id.should.equal(i.toString(), 'id matches again');
-            // set the delete flag to delete the docs in the next step
-            docs[i]._rev = results[i].rev;
-            docs[i]._deleted = true;
+        return db.bulkDocs({ docs: docs });
+      }).then(function (results) {
+        results.should.have.length(5, 'results length matches');
+        for (var i = 0; i < 5; i++) {
+          results[i].id.should.equal(i.toString(), 'id matches again');
+          // set the delete flag to delete the docs in the next step
+          docs[i]._rev = results[i].rev;
+          docs[i]._deleted = true;
+        }
+        return db.put(docs[0]);
+      }).then(function () {
+        return db.bulkDocs({ docs: docs }).then(function (results) {
+          results[0].name.should.equal(
+            'conflict', 'First doc should be in conflict');
+          should.not.exist(results[0].rev, 'no rev in conflict');
+          should.exist(results[0].id);
+          results[0].id.should.equal("0");
+          for (var i = 1; i < 5; i++) {
+            results[i].id.should.equal(i.toString());
+            should.exist(results[i].rev);
           }
-          db.put(docs[0], function () {
-            db.bulkDocs({ docs: docs }, function (err, results) {
-              results[0].name.should.equal(
-                'conflict', 'First doc should be in conflict');
-              should.not.exist(results[0].rev, 'no rev in conflict');
-              for (i = 1; i < 5; i++) {
-                results[i].id.should.equal(i.toString());
-                should.exist(results[i].rev);
-              }
-              done();
-            });
-          });
         });
+      });
+    });
+
+    it('#6039 test id in bulk docs for conflict', function () {
+      var db = new PouchDB(dbs.name);
+      var docs = makeDocs(5);
+      return db.bulkDocs(docs).then(function (res) {
+        docs.forEach(function (doc, i) {
+          doc._rev = res[i].rev;
+        });
+        docs[2]._rev = '3-totally_fake_rev';
+        delete docs[4]._rev;
+        return db.bulkDocs(docs);
+      }).then(function (res) {
+        var expected = [{
+          "id": "0",
+          "rev": "rev_placeholder"
+        }, {
+          "id": "1",
+          "rev": "rev_placeholder"
+        }, {
+          "id": "2",
+          "error": true,
+          "name": "conflict",
+          "status": 409
+        }, {
+          "id": "3",
+          "rev": "rev_placeholder"
+        }, {
+          "id": "4",
+          "error": true,
+          "name": "conflict",
+          "status": 409
+        }];
+        res = res.map(function (x) {
+          // parse+stringify to remove undefineds for comparison
+          return JSON.parse(JSON.stringify({
+            id: x.id,
+            error: x.error && true,
+            name: x.name,
+            status: x.status,
+            rev: (x.rev && "rev_placeholder")
+          }));
+        });
+        res.should.deep.equal(expected);
       });
     });
 
@@ -258,6 +304,69 @@ adapters.forEach(function (adapter) {
         return db.info();
       }).then(function (info) {
         info.doc_count.should.equal(1);
+      });
+    });
+
+    it('bulk docs update then delete then conflict', function () {
+      var db = new PouchDB(dbs.name);
+      var docs= [{_id: '1'}];
+      return db.bulkDocs(docs).then(function (res) {
+        should.not.exist(res[0].error, 'no error');
+        docs[0]._rev = res[0].rev;
+        return db.bulkDocs(docs);
+      }).then(function (res) {
+        should.not.exist(res[0].error, 'no error');
+        docs[0]._rev = res[0].rev;
+        docs[0]._deleted = true;
+        return db.bulkDocs(docs);
+      }).then(function (res) {
+        should.not.exist(res[0].error, 'no error');
+        return db.bulkDocs(docs);
+      }).then(function (res) {
+        should.exist(res[0].error, 'has an error');
+        res[0].name.should.equal(
+          'conflict', 'First doc should be in conflict');
+      });
+    });
+
+    it('bulk docs update then delete then update', function () {
+      var db = new PouchDB(dbs.name);
+      var docs= [{_id: '1'}];
+      return db.bulkDocs(docs).then(function (res) {
+        should.not.exist(res[0].error, 'no error');
+        docs[0]._rev = res[0].rev;
+        return db.bulkDocs(docs);
+      }).then(function (res) {
+        should.not.exist(res[0].error, 'no error');
+        docs[0]._rev = res[0].rev;
+        docs[0]._deleted = true;
+        return db.bulkDocs(docs);
+      }).then(function (res) {
+        should.not.exist(res[0].error, 'no error');
+        docs[0]._rev = res[0].rev;
+        return db.bulkDocs(docs);
+      }).then(function (res) {
+        should.not.exist(res[0].error, 'no error');
+      });
+    });
+
+    it('bulk_docs delete then update then undelete', function () {
+      var db = new PouchDB(dbs.name);
+      var doc = {_id: '1'};
+      return db.bulkDocs([doc]).then(function (res) {
+        should.not.exist(res[0].error, 'should not be an error 1');
+        doc._rev = res[0].rev;
+        doc._deleted = true;
+        return db.bulkDocs([doc]);
+      }).then(function (res) {
+        should.not.exist(res[0].error, 'should not be an error 2');
+        doc._rev = res[0].rev;
+        return db.bulkDocs([doc]);
+      }).then(function (res) {
+        should.not.exist(res[0].error, 'should not be an error 3');
+        doc._rev = res[0].rev;
+        doc._deleted = false;
+        return db.bulkDocs([doc]);
       });
     });
 
