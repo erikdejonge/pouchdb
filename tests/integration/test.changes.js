@@ -88,6 +88,60 @@ adapters.forEach(function (adapter) {
       });
     });
 
+    it('Live changes should clean listener when cancelled', function () {
+      var db = new PouchDB(dbs.name);
+
+      // TODO: The bug was fixed for the 'idb' adapter in
+      // https://github.com/pouchdb/pouchdb/pull/6504, but still happens with
+      // the 'websql' adapter. It needs to be fixed!
+      if (db.adapter === 'websql') {
+        return;
+      }
+
+      return new testUtils.Promise(function (resolve, reject) {
+        // Capture logs
+        var logs = [];
+        var oldLog = console.error;
+        console.error = function () {
+          var args = Array.prototype.slice.call(arguments);
+          logs.push(args);
+          oldLog.apply(console, arguments);
+        };
+
+        // Try to trigger the problem
+        var changes;
+        var i = 0;
+        function renewChangeListener() {
+          changes = db.changes({live: true});
+          if (i++ < 20) {
+            setTimeout(function () {
+              changes.cancel();
+              changes.on('complete', renewChangeListener);
+            }, 0);
+          } else {
+            changes.cancel();
+
+            // Check whether error logs have been output or not
+            changes.on('complete', function () {
+              console.error = oldLog;
+
+              var badLogs = logs.filter(function (args) {
+                return args[0].indexOf(
+                  'possible EventEmitter memory leak detected') !== -1;
+              });
+
+              if (badLogs.length > 0) {
+                reject(new Error(badLogs));
+              } else {
+                resolve();
+              }
+            });
+          }
+        }
+        renewChangeListener();
+      });
+    });
+
     it('Changes Since', function (done) {
       var docs1 = [
         {_id: '0', integer: 0},
@@ -905,6 +959,12 @@ adapters.forEach(function (adapter) {
     });
 
     it('changes w/ many modifications of same doc', function () {
+      // this test depends on the order of changes
+      // so fails against CouchDB 2 when multiple shards are present
+      if (testUtils.isCouchMaster()) {
+        return true;
+      }
+
       var db = new PouchDB(dbs.name);
       var promise = testUtils.Promise.resolve();
       var doc = {_id: '1'};
@@ -2555,6 +2615,116 @@ adapters.forEach(function (adapter) {
       }).then(function () {
         db.post({ test: 'and more stuff' });
       });
+    });
+
+    it('Changes with selector', function (done) {
+      if (!testUtils.isCouchMaster() && adapter === 'http') {
+        return done();
+      }
+
+      var docs = [
+        {_id: '0', user: 'foo'},
+        {_id: '1', user: 'bar'},
+        {_id: '2', user: 'foo'}
+      ];
+      var db = new PouchDB(dbs.name);
+
+      db.bulkDocs({ docs: docs }, function () {
+        db.changes({
+          selector: {"user": "foo"},
+          include_docs: true
+        }).on('complete', function (results) {
+          results.results.length.should.equal(2);
+          var first = findById(results.results, '0');
+          first.doc.user.should.equal('foo');
+          var second = findById(results.results, '2');
+          second.doc.user.should.equal('foo');
+          done();
+        }).on('error', done);
+      });
+    });
+
+    it('Changes with selector, explicit filter', function (done) {
+      if (!testUtils.isCouchMaster() && adapter === 'http') {
+        return done();
+      }
+
+      var docs = [
+        {_id: '0', user: 'foo'},
+        {_id: '1', user: 'bar'},
+        {_id: '2', user: 'foo'}
+      ];
+      var db = new PouchDB(dbs.name);
+
+      db.bulkDocs({ docs: docs }, function () {
+        db.changes({
+          selector: {"user": "foo"},
+          filter: '_selector',
+          include_docs: true
+        }).on('complete', function (results) {
+          results.results.length.should.equal(2);
+          var first = findById(results.results, '0');
+          first.doc.user.should.equal('foo');
+          var second = findById(results.results, '2');
+          second.doc.user.should.equal('foo');
+          done();
+        }).on('error', done);
+      });
+    });
+
+    it('Changes with selector and mismatched filter', function (done) {
+      var db = new PouchDB(dbs.name);
+
+      db.changes({
+        selector: {"user": "foo"},
+        filter: function () { return false; }
+      }).on('complete', function () {
+        done('expected failure');
+      }).on('error', function (err) {
+        err.message.should.equal('selector invalid for filter "function"');
+        done();
+      });
+    });
+
+    it('Changes with limit and selector', function (done) {
+      if (!testUtils.isCouchMaster() && adapter === 'http') {
+        return done();
+      }
+
+      var docs = [
+        {_id: '0', user: 'foo'},
+        {_id: '1', user: 'bar'},
+        {_id: '2', user: 'foo'}
+      ];
+      var db = new PouchDB(dbs.name);
+
+      db.bulkDocs({ docs: docs }, function () {
+        return db.changes({
+          limit: 1,
+          selector: {"user": "foo"},
+          include_docs: true
+        }).on('complete', function (results) {
+          results.results.length.should.equal(1);
+          var first = results.results[0].doc;
+          var last_seq = results.last_seq;
+
+          return db.changes({
+            limit: 1,
+            selector: {"user": "foo"},
+            include_docs: true,
+            since: last_seq
+          }).on('complete', function (results) {
+            results.results.length.should.equal(1);
+            var second = results.results[0].doc;
+
+            first._id.should.not.equal(second._id);
+            first.user.should.equal('foo');
+            second.user.should.equal('foo');
+            done();
+          }).on('error', done)
+          .catch(done);
+        }).on('error', done);
+      }).catch(done);
     });
 
   });

@@ -32,7 +32,7 @@ var builtInModules = require('builtin-modules');
 var external = Object.keys(require('../package.json').dependencies)
   .concat(builtInModules);
 
-var plugins = ['fruitdown', 'localstorage', 'memory'];
+var plugins = ['fruitdown', 'localstorage', 'memory', 'find'];
 
 var currentYear = new Date().getFullYear();
 
@@ -65,6 +65,15 @@ var comments = {
 
   'fruitdown': '// PouchDB fruitdown plugin ' + version +
   '\n// Based on FruitDOWN: https://github.com/nolanlawson/fruitdown' +
+  '\n// ' +
+  '\n// (c) 2012-' + currentYear + ' Dale Harvey and the PouchDB team' +
+  '\n// PouchDB may be freely distributed under the Apache license, ' +
+  'version 2.0.' +
+  '\n// For all details and documentation:' +
+  '\n// http://pouchdb.com\n',
+
+  'find': '// pouchdb-find plugin ' + version +
+  '\n// Based on Mango: https://github.com/cloudant/mango' +
   '\n// ' +
   '\n// (c) 2012-' + currentYear + ' Dale Harvey and the PouchDB team' +
   '\n// PouchDB may be freely distributed under the Apache license, ' +
@@ -151,7 +160,11 @@ function buildPluginsForBrowser() {
 }
 
 function buildPouchDBNext() {
-  return doBrowserify('pouchdb', 'src/next.js', {standalone: 'PouchDB'}).then(function (code) {
+  return doRollup('src/next.js', true, {
+    cjs: 'lib/next.js'
+  }).then(function () {
+    return doBrowserify('pouchdb', 'lib/next.js', {standalone: 'PouchDB'});
+  }).then(function (code) {
     return writeFile('packages/node_modules/pouchdb/dist/pouchdb-next.js', code);
   });
 }
@@ -179,12 +192,6 @@ function doBuildNode() {
     .then(buildForNode);
 }
 
-function doBuildDev() {
-  return doAll(buildForNode, buildForBrowserify)()
-    .then(doAll(buildForBrowser, buildPluginsForBrowserify, buildPouchDBNext))
-    .then(buildPluginsForBrowser);
-}
-
 function doBuildAll() {
   return rimrafMkdirp('lib', 'dist', 'lib/plugins')
     .then(doAll(buildForNode, buildForBrowserify))
@@ -195,8 +202,6 @@ function doBuildAll() {
 function doBuild() {
   if (process.env.BUILD_NODE) { // rebuild before "npm test"
     return doBuildNode();
-  } else if (DEV_MODE) { // rebuild during "npm run dev"
-    return doBuildDev();
   } else { // normal, full build
     return doBuildAll();
   }
