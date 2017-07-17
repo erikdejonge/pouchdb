@@ -194,7 +194,7 @@ adapters.forEach(function (adapters) {
       var remote = new PouchDB(dbs.remote);
       // simulate 5000 normal commits with two conflicts at the very end
       function uuid() {
-        return testUtils.uuid(32, 16).toLowerCase();
+        return testUtils.rev();
       }
 
       var numRevs = 5000;
@@ -327,7 +327,7 @@ adapters.forEach(function (adapters) {
       var numRevs = 200; // repro "url too long" error with open_revs
       var docs = [];
       for (var i = 0; i < numRevs; i++) {
-        var rev =  '1-' + testUtils.uuid(32, 16).toLowerCase();
+        var rev =  '1-' + testUtils.rev();
         docs.push({_id: 'doc', _rev: rev});
       }
 
@@ -647,6 +647,88 @@ adapters.forEach(function (adapters) {
           });
         });
       });
+    });
+
+    it('Test disable checkpoints on both source and target', function (done) {
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      db.bulkDocs({ docs: docs }).then(function () {
+        PouchDB.replicate(db, remote, { checkpoint: false })
+          .on('error', done)
+          .on('complete', function () {
+            testUtils.generateReplicationId(db, remote, {}).then(function (replicationId) {
+              ensureCheckpointIsMissing(db, replicationId)
+                .then(function () {
+                  return ensureCheckpointIsMissing(remote, replicationId);
+                })
+                .then(done)
+                .catch(done);
+            }).catch(done);
+          });
+      }).catch(done);
+
+      function ensureCheckpointIsMissing(db, replicationId) {
+        return db.get(replicationId).then(function () {
+          throw new Error('Found a checkpoint that should not exist for db ' + db.name);
+        }).catch(function (error) {
+          if (error.status === 404) {
+            return;
+          } else {
+            throw error;
+          }
+        });
+      }
+    });
+
+    it('Test write checkpoints on source only', function (done) {
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      db.bulkDocs({ docs: docs }).then(function () {
+        PouchDB.replicate(db, remote, { checkpoint: 'source' })
+          .on('error', done)
+          .on('complete', function () {
+            testUtils.generateReplicationId(db, remote, {}).then(function (replicationId) {
+              db.get(replicationId).then(function () {
+                remote.get(replicationId).then(function () {
+                  done(new Error('Found a checkpoint on target that should not exist'));
+                }).catch(function (error) {
+                  if (error.status === 404) {
+                    done();
+                  } else {
+                    done(error);
+                  }
+                });
+              }).catch(done);
+            }).catch(done);
+          });
+      }).catch(done);
+    });
+
+    it('Test write checkpoints on target only', function (done) {
+      var db = new PouchDB(dbs.name);
+      var remote = new PouchDB(dbs.remote);
+
+      db.bulkDocs({ docs: docs }).then(function () {
+        PouchDB.replicate(db, remote, { checkpoint: 'target' })
+          .on('error', done)
+          .on('complete', function () {
+            testUtils.generateReplicationId(db, remote, {}).then(function (replicationId) {
+              remote.get(replicationId).then(function () {
+                db.get(replicationId).then(function () {
+                  done(new Error('Found a checkpoint on source that should not exist'));
+                }).catch(function (error) {
+                  if (error.status === 404) {
+                    done();
+                  } else {
+                    done(error);
+                  }
+                });
+              }).catch(done);
+            }).catch(done);
+          });
+      }).catch(done);
     });
 
     it('#3136 open revs returned correctly 1', function () {
@@ -2164,7 +2246,7 @@ adapters.forEach(function (adapters) {
           // needed to cause the code to fetch using get
           _attachments: {
             text: {
-              content_type: 'text\/plain',
+              content_type: 'text/plain',
               data: "VGhpcyBpcyBhIGJhc2U2NCBlbmNvZGVkIHRleHQ="
             }
           }
@@ -2879,7 +2961,7 @@ adapters.forEach(function (adapters) {
 
       Array.apply(null, {length: num}).forEach(function (_, i) {
         doc._attachments['file_' + i] = {
-          content_type: 'text\/plain',
+          content_type: 'text/plain',
           data: testUtils.makeBlob('Some text: ' + i)
         };
       });
@@ -3199,22 +3281,18 @@ adapters.forEach(function (adapters) {
       var remote = new PouchDB(dbs.remote);
       var docid = "mydoc";
 
-      function uuid() {
-        return testUtils.uuid(32, 16).toLowerCase();
-      }
-
       // create a bunch of rando, good revisions
       var numRevs = 5;
       var uuids = [];
       for (var i = 0; i < numRevs - 1; i++) {
-        uuids.push(uuid());
+        uuids.push(testUtils.rev());
       }
 
       // good branch
       // this branch is one revision ahead of the conflicted branch
-      var a_conflict = uuid();
-      var a_burner = uuid();
-      var a_latest = uuid();
+      var a_conflict = testUtils.rev();
+      var a_burner = testUtils.rev();
+      var a_latest = testUtils.rev();
       var a_rev_num = numRevs + 2;
       var a_doc = {
         _id: docid,
@@ -3226,8 +3304,8 @@ adapters.forEach(function (adapters) {
       };
 
       // conflicted deleted branch
-      var b_conflict = uuid();
-      var b_deleted = uuid();
+      var b_conflict = testUtils.rev();
+      var b_deleted = testUtils.rev();
       var b_rev_num = numRevs + 1;
       var b_doc = {
         _id: docid,
@@ -4038,7 +4116,7 @@ adapters.forEach(function (adapters) {
       var ajax = remote._ajax;
       remote._ajax = function (opts) {
         // the http adapter takes 5s off the provided timeout
-        if (/timeout=15000/.test(opts.url)) {
+        if (/timeout=20000/.test(opts.url)) {
           seenTimeout = true;
         }
         ajax.apply(this, arguments);

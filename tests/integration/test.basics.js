@@ -110,7 +110,39 @@ adapters.forEach(function (adapter) {
         throw new Error('should not be here');
       }).catch(function (err) {
         should.exist(err);
-        err.requestedDocId.should.equal('abc-123');
+        err.docId.should.equal('abc-123');
+      });
+    });
+
+    it('PUTed Conflicted doc should contain ID in error object', function () {
+      var db = new PouchDB(dbs.name);
+      var savedDocId;
+      return db.post({}).then(function (info) {
+        savedDocId = info.id;
+        return db.put({
+          _id: savedDocId,
+        });
+      }).then(function () {
+        throw new Error('should not be here');
+      }).catch(function (err) {
+        err.should.have.property('status', 409);
+        err.docId.should.equal(savedDocId);
+      });
+    });
+
+    it('POSTed Conflicted doc should contain ID in error object', function () {
+      var db = new PouchDB(dbs.name);
+      var savedDocId;
+      return db.post({}).then(function (info) {
+        savedDocId = info.id;
+        return db.post({
+          _id: savedDocId,
+        });
+      }).then(function () {
+        throw new Error('should not be here');
+      }).catch(function (err) {
+        err.should.have.property('status', 409);
+        err.docId.should.equal(savedDocId);
       });
     });
 
@@ -494,7 +526,6 @@ adapters.forEach(function (adapter) {
       var db = new PouchDB(dbs.name);
       db.bulkDocs({ docs: bad_docs }, function (err) {
         err.name.should.equal('doc_validation');
-        err.status.should.equal(testUtils.errors.DOC_VALIDATION.status);
         err.message.should.equal(testUtils.errors.DOC_VALIDATION.message +
                                  ': _zing',
                                  'correct error message returned');
