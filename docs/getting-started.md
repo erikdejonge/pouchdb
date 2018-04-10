@@ -26,7 +26,8 @@ We will start with a template of the project where all the data related function
 
 {% highlight bash %}
 $ cd pouchdb-getting-started-todo
-$ python -m SimpleHTTPServer
+$ python -m SimpleHTTPServer  # for Python 2
+$ python -m http.server       # for Python 3
 {% endhighlight %}
 
 Then visit [http://127.0.0.1:8000/](http://127.0.0.1:8000/). If you see the following screenshot, you are good to go:
@@ -40,7 +41,7 @@ It's also a good idea to open your browser's console so you can see any errors o
 Open `index.html` and include PouchDB in the app by adding a script tag:
 
 {% highlight html %}
-<script src="//cdn.jsdelivr.net/pouchdb/{{site.version}}/pouchdb.min.js"></script>
+<script src="//cdn.jsdelivr.net/npm/pouchdb@{{site.version}}/dist/pouchdb.min.js"></script>
 <script src="js/base.js"></script>
 <script src="js/app.js"></script>
 {% endhighlight %}
@@ -126,7 +127,7 @@ function checkboxChanged(todo, event) {
 }
 {% endhighlight %}
 
-This is similiar to creating a document, however the document must also contain a `_rev` field (in addition to `_id`), otherwise the write will be rejected. This ensures that you dont accidently overwrite changes to a document.
+This is similar to creating a document, however the document must also contain a `_rev` field (in addition to `_id`), otherwise the write will be rejected. This ensures that you dont accidently overwrite changes to a document.
 
 You can test that this works by checking a todo item and refreshing the page. It should stay checked.
 

@@ -5,9 +5,13 @@
   // eg: test.html?pluginFile=memory.pouchdb.js
   var plugins = window.location.search.match(/[?&]plugins=([^&]+)/);
   var adapters = window.location.search.match(/[?&]adapters=([^&]+)/);
+  var next = window.location.search.match(/[?&]NEXT=([^&]+)/);
+  next = next && next[1] === '1';
   var pouchdbSrc = window.location.search.match(/[?&]src=([^&]+)/);
   if (pouchdbSrc) {
     pouchdbSrc = decodeURIComponent(pouchdbSrc[1]);
+  } else if (next) {
+    pouchdbSrc = '../../packages/node_modules/pouchdb/dist/pouchdb-next.js';
   } else {
     pouchdbSrc = '../../packages/node_modules/pouchdb/dist/pouchdb.js';
   }
@@ -15,7 +19,7 @@
   if (adapters) {
     adapters = adapters[1].split(',');
     adapters.forEach(function (adapter) {
-      if (adapter !== 'websql' && adapter !== 'idb') {
+      if (adapter !== 'idb') {
         // load from plugin
         scriptsToLoad.push(
           '../../packages/node_modules/pouchdb/dist/pouchdb.' + adapter + '.js');
@@ -70,18 +74,24 @@
     }
   }
 
-  function startTests() {
+  function loadScripts() {
 
     function loadNext() {
       if (scriptsToLoad.length) {
         var script = scriptsToLoad.shift();
         asyncLoadScript(script, loadNext);
       } else {
-        onReady();
+        if (document.readyState === 'complete') {
+          startTests();
+        } else {
+          window.addEventListener("load", startTests);
+        }
       }
     }
 
-    function onReady() {
+    function startTests() {
+      window.removeEventListener("load", startTests);
+
       modifyGlobals();
 
       var runner = mocha.run();
@@ -143,6 +153,6 @@
     loadNext();
   }
 
-  startTests();
+  loadScripts();
 
 })();

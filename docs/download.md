@@ -7,8 +7,7 @@ sidebar: nav.html
 {% include anchor.html class="h3" title="Quick Start" hash="file" %}
 
 {% highlight html %}
-<script src="//cdn.jsdelivr.net/pouchdb/{{ site.version }}/pouchdb.min.js">
-</script>
+<script src="//cdn.jsdelivr.net/npm/pouchdb@{{site.version}}/dist/pouchdb.min.js"></script>
 <script>
   var db = new PouchDB('my_database');
 </script>
@@ -54,7 +53,7 @@ PouchDB is hosted at these CDNs:
 
 * [cdnjs](https://cdnjs.com/libraries/pouchdb)
 * [jsdelivr](http://www.jsdelivr.com/#!pouchdb)
-* [unpkg](https://unpkg.com/pouchdb@6.0.4/dist/)
+* [unpkg](https://unpkg.com/pouchdb@{{ site.version }}/dist/)
 
 {% include anchor.html class="h3" title="Bower" hash="bower" %}
 

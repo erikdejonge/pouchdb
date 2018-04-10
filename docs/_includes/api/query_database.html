@@ -27,7 +27,7 @@ All options default to `false` unless otherwise specified.
   * A full CouchDB-style map/reduce view: `{map : ..., reduce: ...}`.
   * A map function by itself (no reduce).
   * The name of a view in an existing design document (e.g. `'mydesigndoc/myview'`, or `'myview'` as a shorthand for `'myview/myview'`).
-* `options.reduce`: Reduce function, or the string name of a built-in function: `'_sum'`, `'_count'`, or `'_stats'`.  Defaults to `false` (no reduce).
+* `options.reduce`: Reduce function, or the string name of a built-in function: `'_sum'`, `'_count'`, or `'_stats'`.  Defaults to `true` when a reduce function is defined, or `false` otherwise.
     * Tip: if you're not using a built-in, [you're probably doing it wrong](http://youtu.be/BKQ9kXKoHS8?t=865s).
     * PouchDB will always call your reduce function with rereduce == false. As for CouchDB, refer to the [CouchDB documentation](http://docs.couchdb.org/en/1.6.1/couchapp/views/intro.html).
 * `options.include_docs`: Include the document in each row in the `doc` field.
@@ -51,6 +51,7 @@ All options default to `false` unless otherwise specified.
     * unspecified (default): Returns the latest results, waiting for the view to build if necessary.
     * `'ok'`: Returns results immediately, even if they're out-of-date.
     * `'update_after'`: Returns results immediately, but kicks off a build afterwards.
+* `options.update_seq`: Include an `update_seq` value indicating which sequence id of the underlying database the view reflects.
 
 For details, see the [CouchDB query options documentation](http://wiki.apache.org/couchdb/HTTP_view_API#Querying_Options).
 
@@ -182,6 +183,8 @@ db.put(ddoc).catch(function (err) {
 {% endhighlight %}
 
 In the result,`total_rows` is the total number of possible results in the view. The response is very similar to that of `allDocs()`.
+
+The result may also have `update_seq` if you set `update_seq` to `true`
 
 **Note:** you can also pass in the map function instead of saving a design doc first, but this is slow because it has to do a full database scan. The following examples will use this pattern for simplicity's sake, but you should normally avoid it.
 

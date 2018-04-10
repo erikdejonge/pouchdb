@@ -10,26 +10,25 @@ adapters.forEach(function (adapters) {
 
     var dbs = {};
 
-    beforeEach(function (done) {
+    beforeEach(function () {
       dbs.name = testUtils.adapterUrl(adapters[0], 'testdb');
       dbs.remote = testUtils.adapterUrl(adapters[1], 'test_repl_remote');
-      testUtils.cleanup([dbs.name, dbs.remote], done);
     });
 
-    after(function (done) {
+    afterEach(function (done) {
       testUtils.cleanup([dbs.name, dbs.remote], done);
     });
 
     it('Issue 5402 should not keep adding event listeners when backoff is firing', function (done) {
       this.timeout(1500);
-      var remote = new PouchDB(dbs.remote);
+      var remote = new PouchDB(dbs.remote, {
+        fetch: function () {
+          throw new Error('flunking you');
+        }
+      });
       var db = new PouchDB(dbs.name);
       var backOffCount = 0;
       var numberOfActiveListeners = 0;
-
-      remote._ajax = function (opts, cb) {
-        cb(new Error('flunking you'));
-      };
 
       var replication = db.sync(remote, {
         live: true,

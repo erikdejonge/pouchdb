@@ -7,10 +7,6 @@
 
 var DEV_MODE = process.env.CLIENT === 'dev';
 
-var lie = require('lie');
-if (typeof Promise === 'undefined') {
-  global.Promise = lie; // required for denodeify in node 0.10
-}
 var path = require('path');
 var denodeify = require('denodeify');
 var rollup = require('rollup');
@@ -32,7 +28,7 @@ var builtInModules = require('builtin-modules');
 var external = Object.keys(require('../package.json').dependencies)
   .concat(builtInModules);
 
-var plugins = ['fruitdown', 'localstorage', 'memory', 'find'];
+var plugins = ['fruitdown', 'localstorage', 'memory', 'find', 'websql'];
 
 var currentYear = new Date().getFullYear();
 
@@ -79,16 +75,24 @@ var comments = {
   '\n// PouchDB may be freely distributed under the Apache license, ' +
   'version 2.0.' +
   '\n// For all details and documentation:' +
-  '\n// http://pouchdb.com\n'
+  '\n// http://pouchdb.com\n',
+
+  'websql': '// PouchDB websql plugin ' + version +
+  '\n// Since PouchDB 7.0.0, shipped as a separate plugin.' +
+  '\n// ' +
+  '\n// (c) 2012-' + currentYear + ' Dale Harvey and the PouchDB team' +
+  '\n// PouchDB may be freely distributed under the Apache license, ' +
+  'version 2.0.' +
+  '\n// For all details and documentation:' +
+  '\n// http://pouchdb.com\n',
 };
 
-function doRollup(entry, browser, formatsToFiles) {
+function doRollup(input, browser, formatsToFiles) {
   var start = process.hrtime();
   return rollup.rollup({
-    entry: addPath('pouchdb', entry),
+    input: addPath('pouchdb', input),
     external: external,
     plugins: rollupPlugins({
-      skip: external,
       jsnext: true,
       browser: browser,
       main: false  // don't use "main"s that are CJS
@@ -100,7 +104,7 @@ function doRollup(entry, browser, formatsToFiles) {
         if (DEV_MODE) {
           var ms = Math.round(process.hrtime(start)[1] / 1000000);
           console.log('    took ' + ms + ' ms to rollup ' +
-                      path.dirname(entry) + '/' + path.basename(entry));
+                      path.dirname(input) + '/' + path.basename(input));
         }
         return writeFile(addPath('pouchdb', fileOut), bundle.code);
       });

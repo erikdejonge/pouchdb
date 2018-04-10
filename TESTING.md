@@ -1,7 +1,7 @@
 Running PouchDB Tests
 --------------------------------------
 
-The PouchDB test suite expects an instance of CouchDB (version 1.6.1 and above) running in [Admin Party](http://guide.couchdb.org/draft/security.html#party) on http://127.0.0.1:5984 with [CORS enabled](https://github.com/pouchdb/add-cors-to-couchdb), you can configure this by sending the `COUCH_HOST` env var.
+The PouchDB test suite expects an instance of CouchDB (version 1.6.1 and above) running in [Admin Party](http://guide.couchdb.org/draft/security.html#party) on http://127.0.0.1:5984 with [CORS enabled](https://github.com/pouchdb/add-cors-to-couchdb), you can configure this by setting the `COUCH_HOST` env var.
 
  * PouchDB has been primarily developed on Linux and OSX, if you are using Windows then these instructions will have problems, we would love your help fixing them though.
 
@@ -36,11 +36,7 @@ To test a specific plugin in the browser run:
 
 ### Unit tests
 
-    $ npm run build-as-modular-es5
     $ npm run test-unit
-
-These are tests that confirm small parts of PouchDB functionality. In order to
-work correctly with ES6, they are first transpiled to `lib` as modular ES5 (`run run build-as-modular-es5`) using Babel, and then tested as CommonJS modules. See `build-as-modular-es5.sh` for details.
 
 ### Test Options
 
@@ -53,9 +49,6 @@ or append `?grep=test.replication.js` if you opened the tests in a browser manua
 #### Test Coverage
 
     $ npm run test-coverage
-
-Again, this uses `npm run build-as-modular-es5` in order to fully test the codebase
-as a non-bundle. See `build-as-modular-es5.sh` for details.
 
 #### Test alternative server
 

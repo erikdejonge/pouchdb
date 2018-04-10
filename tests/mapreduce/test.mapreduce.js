@@ -1325,7 +1325,12 @@ function tests(suiteName, dbName, dbType, viewType) {
 
       // Need to avoid the cache to workaround
       // https://issues.apache.org/jira/browse/COUCHDB-2880
-      var db = new PouchDB(dbName, {ajax: {cache: false}});
+      var db = new PouchDB(dbName, {
+        fetch: function (url, opts) {
+          opts.cache = 'no-store';
+          return PouchDB.fetch(url, opts);
+        }
+      });
       var docs = [];
       for (var i = 0; i < 5; i++) {
         docs.push({
@@ -1366,7 +1371,12 @@ function tests(suiteName, dbName, dbType, viewType) {
 
       // Need to avoid the cache to workaround
       // https://issues.apache.org/jira/browse/COUCHDB-2880
-      var db = new PouchDB(dbName, {ajax: {cache: false}});
+      var db = new PouchDB(dbName, {
+        fetch: function (url, opts) {
+          opts.cache = 'no-store';
+          return PouchDB.fetch(url, opts);
+        }
+      });
       var docs = [];
       for (var i = 0; i < 5; i++) {
         docs.push({
@@ -1659,8 +1669,7 @@ function tests(suiteName, dbName, dbType, viewType) {
         },
         reduce: '_count'
       }).then(function (queryFun) {
-        return db.query(queryFun, {group_level: -1, reduce: true})
-            .then(function (res) {
+        return db.query(queryFun, {group_level: -1, reduce: true}).then(function (res) {
           res.should.not.exist('expected error on invalid group_level');
         }).catch(function (err) {
           err.status.should.equal(400);
@@ -3737,6 +3746,92 @@ function tests(suiteName, dbName, dbType, viewType) {
           var values = res.rows.map(function (x) { return x.value; });
           values.should.have.length(docs.length);
           values[0].should.equal(2);
+        });
+      });
+    });
+
+    it('#6230 Test db.query() opts update_seq: false', function () {
+      var db = new PouchDB(dbName);
+      var docs = [];
+      for (var i = 0; i < 4; i++) {
+        docs.push({
+          _id: i.toString(),
+          name: 'foo',
+        });
+      }
+      return createView(db, {
+        map: "function(doc){emit(doc.name);};\n"
+      }).then(function (queryFun) {
+        return db.bulkDocs({ docs: docs }).then(function () {
+          return db.query(queryFun, { update_seq: false });
+        }).then(function (result) {
+          result.rows.should.have.length(4);
+          should.not.exist(result.update_seq);
+        });
+      });
+    });
+
+
+    it('#6230 Test db.query() opts update_seq: true', function () {
+
+      var db = new PouchDB(dbName);
+      var docs = [];
+      for (var i = 0; i < 4; i++) {
+        docs.push({
+          _id: i.toString(),
+          name: 'foo',
+        });
+      }
+
+      return db.bulkDocs({ docs: docs }).then(function () {
+        return createView(db, {
+          map: "function(doc){emit(doc.name);};\n"
+        });
+      }).then(function (queryFun) {
+        return db.query(queryFun, { update_seq: true });
+      }).then(function (result) {
+        result.rows.should.have.length(4);
+        should.exist(result.update_seq);
+        result.update_seq.should.satisfy(function (update_seq) {
+          if (typeof update_seq === 'number' || typeof update_seq === 'string') {
+            return true;
+          } else {
+            return false;
+          }
+        });
+        var normSeq = normalizeSeq(result.update_seq);
+        normSeq.should.be.a('number');
+      });
+
+      function normalizeSeq(seq) {
+        try {
+          if (typeof seq === 'string' && seq.indexOf('-') > 0) {
+            return parseInt(seq.substring(0, seq.indexOf('-')));
+          }
+          return seq;
+        } catch (err) {
+          return seq;
+        }
+      }
+    });
+
+    it('#6230 Test db.query() opts with update_seq missing', function () {
+      var db = new PouchDB(dbName);
+      var docs = [];
+      for (var i = 0; i < 4; i++) {
+        docs.push({
+          _id: i.toString(),
+          name: 'foo',
+        });
+      }
+      return createView(db, {
+        map: "function(doc){emit(doc.name);};\n"
+      }).then(function (queryFun) {
+        return db.bulkDocs({ docs: docs }).then(function () {
+          return db.query(queryFun);
+        }).then(function (result) {
+          result.rows.should.have.length(4);
+          should.not.exist(result.update_seq);
         });
       });
     });

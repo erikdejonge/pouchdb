@@ -71,6 +71,11 @@ A list of known products and services that are using PouchDB.
 
 [Medic Mobile](http://medicmobile.org) is a software toolkit that combines smart messaging, decision support, easy data gathering and management, and health system analytics. Thanks to PouchDB our tools are offline first so workers can file reports wherever they are and sync when back online.
 
+## MoneyTracker.cc
+
+[MoneyTracker](https://moneytracker.cc/) is an open-source personal finances tracking web app. This app can work offline on desktop, tablet and mobile.
+Data is stored locally on device in PouchDB database and can be synced to the cloud.
+
 ## NPM Browser
 
 [NPM Browser](http://www.npm-browser.com/#/) is a fully offline cache of NPM packages, which runs in your browser, using Angular.js, PouchDB, and the pouchdb-load plugin.
@@ -80,6 +85,12 @@ A list of known products and services that are using PouchDB.
 {% include img.html width=100 src="pokedexorg-logo.png" alt="Pokedex.org logo" %}
 
 [Pokedex.org](https://www.pokedex.org/) [(Github)](https://github.com/nolanlawson/pokedex.org) is a progressive web app, powered by ServiceWorker, PouchDB, virtual-dom, and web workers.
+
+## Quizster
+
+{% include img.html width=100 src="quizster.svg" alt="Quizster" href="https://quizster.co" %}
+
+[Quizster](https://quizster.co) is a photo-based submission and feedback system. Quizster uses PouchDB to allow real-time communication between students and teachers.
 
 ## Squarespace Blog
 
@@ -94,6 +105,12 @@ Story-writer is a free Markdown editor, with a [web version](http://markdown.xia
 ## Thali project
 
 [Thali](http://thaliproject.org/) is a Microsoft-sponsored open-source platform for creating apps that exploit the power of personal devices and put people in control of their data. It uses Cordova, PouchDB, OpenSSL, and Tor.
+
+## StudyMD
+
+{% include img.html width=100 src="studymd.png" alt="StudyMD" %}
+
+[StudyMD](https://github.com/jotron/StudyMD) transforms your markdown files into flashcards. It's an electronjs app based on reactjs. PouchDB is used in Node.js for storing the flashcards in a LevelDB database.
 
 ## YLD
 

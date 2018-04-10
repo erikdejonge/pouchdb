@@ -2,10 +2,6 @@
 
 var DEV_MODE = process.env.CLIENT === 'dev';
 
-var lie = require('lie');
-if (typeof Promise === 'undefined') {
-  global.Promise = lie; // required for denodeify in node 0.10
-}
 var path = require('path');
 var denodeify = require('denodeify');
 var browserify = require('browserify');
@@ -33,7 +29,7 @@ function writeFile(filename, contents) {
 }
 
 function doUglify(pkgName, code, prepend, fileOut) {
-  var miniCode = prepend + UglifyJS.minify(code);
+  var miniCode = prepend + UglifyJS.minify(code).code;
   return writeFile(addPath(pkgName, fileOut), miniCode);
 }
 

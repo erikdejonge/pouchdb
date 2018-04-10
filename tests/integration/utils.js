@@ -18,16 +18,6 @@ testUtils.isCouchMaster = function () {
     testUtils.params().SERVER === 'couchdb-master';
 };
 
-testUtils.isSyncGateway = function () {
-  return 'SERVER' in testUtils.params() &&
-    testUtils.params().SERVER === 'sync-gateway';
-};
-
-testUtils.isExpressRouter = function () {
-  return 'SERVER' in testUtils.params() &&
-    testUtils.params().SERVER === 'pouchdb-express-router';
-};
-
 testUtils.params = function () {
   if (typeof process !== 'undefined' && !process.browser) {
     return process.env;
@@ -58,7 +48,8 @@ testUtils.couchHost = function () {
   }
 
   if ('couchHost' in testUtils.params()) {
-    return testUtils.params().couchHost;
+    // Remove trailing slash from url if the user defines one
+    return testUtils.params().couchHost.replace(/\/$/, '');
   }
 
   return 'http://localhost:5984';
@@ -107,9 +98,7 @@ testUtils.adapterUrl = function (adapter, name) {
 
   // CouchDB master has problems with cycling databases rapidly
   // so give tests seperate names
-  if (testUtils.isCouchMaster()) {
-    name += '_' + Date.now();
-  }
+  name += '_' + Date.now();
 
   if (adapter === 'http') {
     return testUtils.couchHost() + '/' + name;
@@ -192,8 +181,9 @@ testUtils.putTree = function (db, tree, callback) {
 };
 
 testUtils.isCouchDB = function (cb) {
-  testUtils.ajax({url: testUtils.couchHost() + '/' }, function (err, res) {
-    // either CouchDB or pouchdb-server qualify here
+  PouchDB.fetch(testUtils.couchHost(), {}).then(function (response) {
+    return response.json();
+  }).then(function (res) {
     cb('couchdb' in res || 'express-pouchdb' in res);
   });
 };

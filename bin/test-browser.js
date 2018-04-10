@@ -16,7 +16,7 @@ var testTimeout = 30 * 60 * 1000;
 var username = process.env.SAUCE_USERNAME;
 var accessKey = process.env.SAUCE_ACCESS_KEY;
 
-var SELENIUM_VERSION = process.env.SELENIUM_VERSION || '2.53.1';
+var SELENIUM_VERSION = process.env.SELENIUM_VERSION || '3.7.1';
 var FIREFOX_BIN = process.env.FIREFOX_BIN;
 
 // BAIL=0 to disable bailing
@@ -94,13 +94,6 @@ if (process.env.NEXT) {
 
 testUrl += '?';
 testUrl += querystring.stringify(qs);
-
-if (process.env.TRAVIS &&
-    client.runner === 'saucelabs' &&
-    process.env.TRAVIS_SECURE_ENV_VARS === 'false') {
-  console.error('Not running test, cannot connect to saucelabs');
-  process.exit(0);
-}
 
 function testError(e) {
   console.error(e);
@@ -186,7 +179,7 @@ function startSauceConnect(callback) {
 
 function startTest() {
 
-  console.log('Starting', client);
+  console.log('Starting', client, 'on', testUrl);
 
   var opts = {
     browserName: client.browser,

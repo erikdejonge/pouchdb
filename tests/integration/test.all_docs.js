@@ -6,15 +6,14 @@ adapters.forEach(function (adapter) {
   describe('test.all_docs.js-' + adapter, function () {
 
     var dbs = {};
-    beforeEach(function (done) {
-      dbs = {name: testUtils.adapterUrl(adapter, 'testdb')};
-      testUtils.cleanup([dbs.name], done);
+
+    beforeEach(function () {
+      dbs.name = testUtils.adapterUrl(adapter, 'testdb');
     });
 
     afterEach(function (done) {
       testUtils.cleanup([dbs.name], done);
     });
-
 
     var origDocs = [
       {_id: '0', a: 1, b: 1},
@@ -126,6 +125,8 @@ adapters.forEach(function (adapter) {
         });
       }).then(function (result) {
         result.rows.map(keyFunc).should.deep.equal(keys);
+        result.rows[keys.indexOf('2')].value.deleted.should.equal(true, 'deleted doc with keys option');
+        (result.rows[keys.indexOf('2')].doc === null).should.equal(true, 'deleted doc with keys option');
       });
     });
 
@@ -140,6 +141,28 @@ adapters.forEach(function (adapter) {
         res.total_rows.should.equal(4);
         res.rows.should.have.length(1);
         res.rows[0].id.should.equal('1');
+      });
+    });
+
+    it('Testing allDocs opts.keys with limit', function () {
+      var db = new PouchDB(dbs.name);
+      return db.bulkDocs(origDocs).then(function () {
+        return db.allDocs({
+          keys: ['3', '1'],
+          limit: 1
+        });
+      }).then(function (res) {
+        res.total_rows.should.equal(4);
+        res.rows.should.have.length(1);
+        res.rows[0].id.should.equal('3');
+        return db.allDocs({
+          keys: ['0', '2'],
+          limit: 3
+        });
+      }).then(function (res) {
+        res.rows.should.have.length(2);
+        res.rows[0].id.should.equal('0');
+        res.rows[1].id.should.equal('2');
       });
     });
 
@@ -165,6 +188,7 @@ adapters.forEach(function (adapter) {
               should.exist(deleted.ok);
 
               db.changes({
+                return_docs: true,
                 since: update_seq
               }).on('complete', function (changes) {
                 var deleted_ids = changes.results.map(function (c) {
@@ -192,6 +216,7 @@ adapters.forEach(function (adapter) {
             doc.updated = 'totally';
             db.put(doc, function () {
               db.changes({
+                return_docs: true,
                 since: update_seq
               }).on('complete', function (changes) {
                 var ids = changes.results.map(function (c) { return c.id; });
@@ -242,6 +267,7 @@ adapters.forEach(function (adapter) {
             db.get('3', function (err, winRev) {
               winRev._rev.should.equal(conflictDoc2._rev);
               db.changes({
+                return_docs: true,
                 include_docs: true,
                 conflicts: true,
                 style: 'all_docs'
@@ -750,6 +776,63 @@ adapters.forEach(function (adapter) {
         });
       }).then(function (result) {
         should.not.exist(result.rows[0].doc._conflicts);
+      });
+    });
+    
+    it('#6230 Test allDocs opts update_seq: false', function () {
+      var db = new PouchDB(dbs.name);
+      return db.bulkDocs(origDocs).then(function () {
+        return db.allDocs({
+          update_seq: false
+        });
+      }).then(function (result) {
+        result.rows.should.have.length(4);
+        should.not.exist(result.update_seq);
+      });
+    });
+    
+    
+    it('#6230 Test allDocs opts update_seq: true', function () {
+
+      var db = new PouchDB(dbs.name);
+
+      return db.bulkDocs(origDocs).then(function () {
+        return db.allDocs({
+          update_seq: true
+        });
+      }).then(function (result) {
+        result.rows.should.have.length(4);
+        should.exist(result.update_seq);
+        result.update_seq.should.satisfy(function (update_seq) {
+          if (typeof update_seq === 'number' || typeof update_seq === 'string') {
+            return true;
+          } else {
+            return false;
+          }
+        });
+        var normSeq = normalizeSeq(result.update_seq);
+        normSeq.should.be.a('number');
+      });
+
+      function normalizeSeq(seq) {
+        try {
+          if (typeof seq === 'string' && seq.indexOf('-') > 0) {
+            return parseInt(seq.substring(0, seq.indexOf('-')));
+          }
+          return seq;
+        } catch (err) {
+          return seq;
+        }
+      }
+    });
+
+    it('#6230 Test allDocs opts with update_seq missing', function () {
+      var db = new PouchDB(dbs.name);
+      return db.bulkDocs(origDocs).then(function () {
+        return db.allDocs();
+      }).then(function (result) {
+        result.rows.should.have.length(4);
+        should.not.exist(result.update_seq);
       });
     });
   });

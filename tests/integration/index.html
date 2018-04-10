@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html>
   <head>
     <meta charset="utf-8">
@@ -7,6 +7,7 @@
   </head>
   <body>
     <div id="mocha"></div>
+    <script src="../../node_modules/whatwg-fetch/fetch.js"></script>
     <script src="../../node_modules/mocha/mocha.js"></script>
     <script src="../../node_modules/chai/chai.js"></script>
     <script src="../../node_modules/chai-as-promised/lib/chai-as-promised.js"></script>
@@ -20,7 +21,6 @@
     </script>
     <script src='utils-bundle.js'></script>
     <script src='test.setup_global_hooks.js'></script>
-    <script src='test.ajax.js'></script>
     <script src='test.aa.setup.js'></script>
     <script src='test.basics.js'></script>
     <script src='test.constructor.js'></script>
@@ -53,6 +53,7 @@
     <script src='test.slash_id.js'></script>
     <script src='test.reserved.js'></script>
     <script src='test.prefix.js'></script>
+    <script src='test.deterministicrevs.js'></script>
     <script src='browser.worker.js'></script>
     <script type="text/javascript" src="./webrunner.js"></script>
   </body>
