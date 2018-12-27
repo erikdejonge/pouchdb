@@ -6,7 +6,7 @@
 if [[ ! -z $SERVER ]]; then
   if [ "$SERVER" == "pouchdb-server" ]; then
     export COUCH_HOST='http://127.0.0.1:6984'
-    if [[ "$TRAVIS_REPO_SLUG" == "pouchdb/pouchdb" ]]; then
+    if [[ "$TRAVIS_REPO_SLUG" == "pouchdb/pouchdb" || "$COVERAGE" == 1 ]]; then
       # in travis, link pouchdb-servers dependencies on pouchdb
       # modules to the current implementations
       mkdir pouchdb-server-install
@@ -54,16 +54,6 @@ if [[ ! -z $SERVER ]]; then
     node ./tests/misc/express-pouchdb-minimum-for-pouchdb.js &
     export SERVER_PID=$!
     export COUCH_HOST='http://127.0.0.1:3000'
-  elif [ "$SERVER" == "sync-gateway" ]; then
-    if [[ -z $COUCH_HOST ]]; then
-      export COUCH_HOST='http://127.0.0.1:4985'
-    fi
-    if [[ "$TRAVIS_REPO_SLUG" == "pouchdb/pouchdb" ]]; then
-      ./bin/run-csg-on-travis.sh
-    fi
-    node ./tests/misc/sync-gateway-config-server.js &
-    # not the Sync Gateway pid, the config server pid
-    export SERVER_PID=$!
   else
     # I mistype pouchdb-server a lot
     echo -e "Unknown SERVER $SERVER. Did you mean pouchdb-server?\n"

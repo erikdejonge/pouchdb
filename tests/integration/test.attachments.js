@@ -3103,7 +3103,7 @@ adapters.forEach(function (adapter) {
     var isSafari = (typeof process === 'undefined' || process.browser) &&
       /Safari/.test(window.navigator.userAgent) &&
       !/Chrome/.test(window.navigator.userAgent);
-    if (!isSafari) {
+    if (!isSafari && !testUtils.isIE()) {
       // skip in safari/ios because of size limit popup
       it('putAttachment and getAttachment with big png data', function (done) {
 
@@ -3233,6 +3233,24 @@ adapters.forEach(function (adapter) {
           doc._attachments.one.revpos.should.equal(1);
           done();
         });
+      });
+    });
+
+    it('#7403 {attachments: true, binary: true, include_docs: true} in allDocs with one missing doc', function () {
+      var docs = [binAttDoc];
+      var db = new PouchDB(dbs.name);
+      var keys;
+      return db.bulkDocs(docs).then(function () {
+        keys = ['bin_doc', 'thisDocIsNotInDB'];
+        return db.allDocs({
+          keys: keys,
+          attachments: true,
+          binary: true,
+          include_docs: true
+        });
+      }).then(function (result) {
+        should.exist(result.rows[0].doc._attachments);
+        result.rows[1].error.should.equal('not_found');
       });
     });
 

@@ -23,18 +23,17 @@ testCases.push(function (dbType, context) {
     });
 
     describe('$in', function () {
-      it('should return docs match single value in array', function () {
-        var db = context.db;
-        return db.find({
-          selector: {
-            name: {
-              $gt: null
+        it('should return docs match single value in array', function () {
+          var selector = {
+            selector: {
+              favorites: {
+                $in: ["Mario"]
+              }
             },
-            favorites: {
-              $in: ["Mario"]
-            }
-          },
-        }).then(function (resp) {
+          };
+          var db = context.db;
+          return db.find(selector)
+          .then(function (resp) {
           var docs = resp.docs.map(function (doc) {
             delete doc._rev;
             return doc;
@@ -44,20 +43,17 @@ testCases.push(function (dbType, context) {
             { name: 'James', _id: 'james',  favorites: ['Mario', 'Pokemon'], age: 20},
             { name: 'William', _id: 'william', favorites: ['Mario'], age: 23 }
           ]);
+
+          return db.explain(selector);
+        })
+        .then(function (resp) {
+          resp.index.name.should.deep.equal('_all_docs');
         });
       });
-
-      it('should use default index due to non-logical operators', function () {
+      
+      it('should use name index', function () {
         var db = context.db;
-        var index = {
-          "index": {
-            "fields": ["name", "age"]
-          },
-          "type": "json"
-        };
-        return db.createIndex(index)
-        .then(function () {
-          return db.find({
+        var selector = {
             selector: {
               name: {
                 $in: ['James', 'Link']
@@ -66,7 +62,11 @@ testCases.push(function (dbType, context) {
                 $gt: 21
               }
             },
-          });
+          };
+        return db.explain(selector)
+        .then(function (resp) {
+          resp.index.name.should.deep.equal('name-index');
+          return db.find(selector);
         }).then(function (resp) {
           var docs = resp.docs.map(function (doc) {
             delete doc._rev;
@@ -140,9 +140,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             age: {
               $in: [20, 23]
             }
@@ -165,9 +162,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $in: ["Mario", "Zelda"]
             }
@@ -190,9 +184,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $in: ["TMNT"]
             }
@@ -208,9 +199,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $all: ["Mario"]
             }
@@ -232,9 +220,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $all: ['Mario', 'Pokemon']
             }
@@ -255,9 +240,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $all: ["Mario", "Zelda"]
             }
@@ -273,9 +255,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $size: 1
             }
@@ -297,9 +276,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $size: 2
             }
@@ -321,9 +297,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $size: 5
             }
@@ -339,9 +312,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $nin: ["Mario"]
             }
@@ -363,9 +333,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            _id: {
-              $gt: 'a'
-            },
             name: {
               $nin: ['James', 'William']
             }
@@ -387,9 +354,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             age: {
               $nin: [20, 23]
             }
@@ -411,9 +375,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $nin: ["Pokemon", "Zelda"]
             }
@@ -434,9 +395,6 @@ testCases.push(function (dbType, context) {
         var db = context.db;
         return db.find({
           selector: {
-            name: {
-              $gt: null
-            },
             favorites: {
               $nin: ["TMNT"]
             }

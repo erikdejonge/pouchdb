@@ -325,6 +325,9 @@ adapters.forEach(function (adapter) {
     });
 
     it('Remove doc twice with specified id', function () {
+      if (testUtils.isIE()) {
+        return Promise.resolve();
+      }
       var db = new PouchDB(dbs.name);
       return db.put({_id: 'specifiedId', test: 'somestuff'}).then(function () {
         return db.get('specifiedId');
@@ -1069,6 +1072,14 @@ adapters.forEach(function (adapter) {
           err.message.should.equal('database is closed');
         });
       });
+    });
+
+    it('7259 should have "this" keyword properly scoped', function () {
+      var doc = { _id: 'foo' };
+      var db = new PouchDB(dbs.name);
+      return db.put(doc).then(function () {
+        return doc._id;
+      }).then(db.get);
     });
 
     if (adapter === 'local') {
